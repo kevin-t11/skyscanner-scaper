@@ -26,6 +26,16 @@ export function PlaceField({ label, direction, value, onChange }: PlaceFieldProp
   const [loading, setLoading] = useState(false);
   const cache = useRef(new Map<string, Place[]>());
 
+  // A value set from outside (swap, popular route) shows its name; clearing it keeps what the user typed.
+  const [shownCode, setShownCode] = useState(value?.code);
+  if (value?.code !== shownCode) {
+    setShownCode(value?.code);
+    if (value) {
+      setQuery(value.name);
+      setPlaces((current) => (current.some((p) => p.code === value.code) ? current : [value, ...current]));
+    }
+  }
+
   useEffect(() => {
     const q = query.trim();
     if (q.length < 2 || (value && q === value.name)) return;
@@ -66,7 +76,10 @@ export function PlaceField({ label, direction, value, onChange }: PlaceFieldProp
           if (place) setQuery(place.name);
         }}
         query={query}
-        onQueryChange={setQuery}
+        onQueryChange={(next) => {
+          setQuery(next);
+          if (value && next !== value.name) onChange(null);
+        }}
         filter={() => true}
       >
         <ComboboxTrigger className="w-full">

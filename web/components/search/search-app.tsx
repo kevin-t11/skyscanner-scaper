@@ -160,7 +160,7 @@ export function SearchApp() {
         </div>
 
         <div className="grid items-end gap-3 md:grid-cols-[1fr_auto_1fr_minmax(12rem,0.8fr)_auto]">
-          <PlaceField key={`from-${from?.code ?? ""}`} label="From" direction="from" value={from} onChange={setFrom} />
+          <PlaceField label="From" direction="from" value={from} onChange={setFrom} />
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -179,12 +179,12 @@ export function SearchApp() {
             </TooltipTrigger>
             <TooltipContent>Swap</TooltipContent>
           </Tooltip>
-          <PlaceField key={`to-${to?.code ?? ""}`} label="To" direction="to" value={to} onChange={setTo} />
+          <PlaceField label="To" direction="to" value={to} onChange={setTo} />
           <div className="space-y-1.5">
             <span className="block text-xs text-muted-foreground">{trip === "return" ? "Dates" : "Date"}</span>
             <DateField trip={trip} value={dates} onChange={setDates} min={isoDate(0)} />
           </div>
-          <Button type="submit" size="lg" disabled={status.kind === "loading"}>
+          <Button type="submit" size="lg" disabled={status.kind === "loading" || missing !== null} title={missing ?? undefined}>
             <SearchIcon className="size-4" />
             Search
           </Button>
