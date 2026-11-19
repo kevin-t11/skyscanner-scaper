@@ -35,6 +35,8 @@ xvfb-run -a bun start         # or `bun start` on a machine with a display
 | `CHROME_PATH` | `google-chrome` | Chrome binary |
 | `HEADLESS` | `false` | Headless Chrome is rejected by the search API; only for debugging |
 | `PORT` | `8080` | HTTP port |
+| `HOST` | `127.0.0.1` | Listen address; use `0.0.0.0` only together with `API_KEY` |
+| `API_KEY` | none | When set, `/url` requires the `x-api-key` header |
 
 ## API
 
@@ -74,7 +76,8 @@ Query parameters read from the URL: `adultsv2`, `childrenv2` (`4\|9`), `cabincla
 | Status | Meaning |
 |---|---|
 | 400 | Invalid parameters or not a flight search URL |
-| 502 | Blocked by PerimeterX twice (sessions are replaced automatically) or upstream error |
+| 401 | `API_KEY` is set and `x-api-key` is missing or wrong |
+| 502 | Blocked by PerimeterX twice (sessions are replaced automatically), no results before the deadline, or upstream error |
 | 503 | No browser session ready yet |
 
 ### `GET /health`

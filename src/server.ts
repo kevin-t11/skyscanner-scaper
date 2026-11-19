@@ -38,16 +38,26 @@ async function handleSearch(search: FlightSearch, input: Record<string, unknown>
   }
 }
 
-export function createServer(search: FlightSearch, health: () => unknown, port: number) {
+export interface ServerOptions {
+  port: number;
+  hostname?: string;
+  apiKey?: string;
+}
+
+export function createServer(search: FlightSearch, health: () => unknown, { port, hostname, apiKey }: ServerOptions) {
+  const authorized = (req: Request) => !apiKey || req.headers.get("x-api-key") === apiKey;
+  const unauthorized = () => json({ error: "missing or invalid x-api-key" }, 401);
   return Bun.serve({
     port,
+    hostname,
     // Complete searches take up to SEARCH_DEADLINE_MS; Bun's default idle timeout is 10 s.
     idleTimeout: 60,
     routes: {
       "/health": () => json(health()),
       "/url": {
-        GET: (req) => handleSearch(search, Object.fromEntries(new URL(req.url).searchParams)),
+        GET: (req) => (authorized(req) ? handleSearch(search, Object.fromEntries(new URL(req.url).searchParams)) : unauthorized()),
         POST: async (req) => {
+          if (!authorized(req)) return unauthorized();
           const body = await req.json().catch(() => null);
           if (!body || typeof body !== "object") return json({ error: "body must be a JSON object" }, 400);
           return handleSearch(search, body as Record<string, unknown>);

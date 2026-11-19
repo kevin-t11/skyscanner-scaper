@@ -1,6 +1,10 @@
 /** Runtime configuration, read once from the environment. */
 export interface Config {
   port: number;
+  /** Interface to listen on; localhost by default because every search spends proxy bandwidth. */
+  hostname: string;
+  /** When set, `/url` requires `x-api-key: <apiKey>`. */
+  apiKey: string | undefined;
   poolSize: number;
   proxyUrl: string | undefined;
   chromePath: string;
@@ -20,6 +24,8 @@ const int = (value: string | undefined, fallback: number): number => {
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
   return {
     port: int(env.PORT, 8080),
+    hostname: env.HOST || "127.0.0.1",
+    apiKey: env.API_KEY || undefined,
     poolSize: int(env.POOL_SIZE, 2),
     proxyUrl: env.PROXY_URL || undefined,
     chromePath: env.CHROME_PATH || "google-chrome",

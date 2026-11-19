@@ -10,7 +10,7 @@ const search: FlightSearch = {
     return { query: {} as any, sort: request.sort, complete: true, total: 0, count: 0, timings: {} as any, itineraries: [] };
   },
 };
-const server = createServer(search, () => ({ ready: 1 }), 0);
+const server = createServer(search, () => ({ ready: 1 }), { port: 0 });
 const base = `http://localhost:${server.port}`;
 afterAll(() => server.stop());
 
@@ -38,6 +38,17 @@ describe("/url", () => {
   ])("GET ?%s → %d", async (query, status) => {
     const res = await fetch(`${base}/url?${query}`);
     expect(res.status).toBe(status);
+  });
+
+  test("requires x-api-key when configured", async () => {
+    const locked = createServer(search, () => ({}), { port: 0, apiKey: "secret" });
+    const url = `http://localhost:${locked.port}/url?url=${encodeURIComponent(URL_)}`;
+    try {
+      expect((await fetch(url)).status).toBe(401);
+      expect((await fetch(url, { headers: { "x-api-key": "secret" } })).status).toBe(200);
+    } finally {
+      locked.stop();
+    }
   });
 
   test("health and 404", async () => {
