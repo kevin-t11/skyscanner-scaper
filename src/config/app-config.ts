@@ -46,6 +46,8 @@ export interface AppConfig {
   outputDir: string;
   /** `LOGGING=enabled|disabled`; default enabled. */
   loggingEnabled: boolean;
+  /** `STOP_WHEN_STABLE=enabled|disabled`; default enabled: return once polls stop adding flights. */
+  stopWhenStable: boolean;
 }
 
 type Env = Record<string, string | undefined>;
@@ -74,5 +76,6 @@ export function loadAppConfig(env: Env = readDotEnv()): AppConfig {
     searchDeadlineMs: SEARCH_DEADLINE_MS,
     outputDir: OUTPUT_DIR,
     loggingEnabled: parseLoggingEnabled(env.LOGGING),
+    stopWhenStable: parseLoggingEnabled(env.STOP_WHEN_STABLE),
   };
 }
