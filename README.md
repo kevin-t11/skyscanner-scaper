@@ -78,7 +78,7 @@ Only these, and only from the `.env` file in the project folder (shell or system
 | `POOL_SIZE` | `1` | Browser sessions (one IP and ~300–700 MB RAM each); raise it for parallel searches |
 | `API_KEY` | none | When set, `/url` requires the `x-api-key` header |
 | `LOGGING` | `enabled` | `enabled` prints the server logs; `disabled` turns them all off |
-| `STOP_WHEN_STABLE` | `enabled` | Return as soon as 2 polls in a row add no flights (`complete: false`, usually 2–4 s sooner); `disabled` waits for Skyscanner's `complete` |
+| `STOP_WHEN_STABLE` | `enabled` | Return after the first poll that adds no flights (`complete: false`, usually 2–4 s sooner); `disabled` waits for Skyscanner's `complete` |
 | `CHROME_PATH` | found automatically | Only needed if Chrome is installed somewhere unusual |
 
 Fixed settings, changed in <code>src/config/app-config.ts</code> if ever needed:

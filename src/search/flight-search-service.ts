@@ -48,8 +48,8 @@ export interface FlightSearch {
 const POLL_INTERVAL_MS = 600;
 /** Skyscanner answers a poll in ~1-2 s; a request hanging past this is a dead proxy connection. */
 const REQUEST_TIMEOUT_MS = 6_000;
-/** With STOP_WHEN_STABLE, stop after this many polls in a row add no itineraries. */
-const STABLE_POLLS = 2;
+/** With STOP_WHEN_STABLE, stop after the first poll that adds no itineraries. */
+const STABLE_POLLS = 1;
 const ROUTE_LOOKUP_TIMEOUT_MS = 10_000;
 const ROUTE_CACHE_LIMIT = 10_000;
 /** One retry on a fresh session after a block; more mostly burns proxy bandwidth. */
