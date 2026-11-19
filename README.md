@@ -150,7 +150,7 @@ lines and output file.
 |---|---|---|
 | 400 | `invalid_request` | Invalid parameters or not a flight search URL |
 | 401 | `unauthorized` | `API_KEY` is set and `x-api-key` is missing or wrong |
-| 502 | `blocked` | PerimeterX blocked the session twice (sessions are replaced automatically) |
+| 502 | `blocked` | PerimeterX blocked the session twice. "Press & Hold" challenges are solved in place first; otherwise sessions are replaced automatically |
 | 502 | `upstream_error` | Skyscanner failed: network error, bad response, unknown airport, or no results before the deadline |
 | 503 | `no_session` | No browser session became ready within 30 s |
 | 500 | `internal_error` | Unexpected error (details in the server log) |
@@ -327,6 +327,7 @@ What each folder and file is for, in the order a `/url` request passes through t
 |---|---|
 | `search-url.ts` | `parseSearchUrl`: turns `/transport/flights/{from}/{to}/{yymmdd}/…?adultsv2&childrenv2&cabinclass` into a `FlightSearchQuery`; impossible dates are rejected |
 | `unified-search-api.ts` | Skyscanner's search API: the endpoint, `buildUnifiedSearchBody` / `buildUnifiedSearchHeaders`, and typed API responses (`ApiItinerary`, `ApiLeg`, …) |
+| `px-challenge.ts` | `solvePressAndHold`: when PerimeterX shows its "Press & Hold" page, moves the mouse to the button, holds it ~10 s with small jitter and releases (same method as the Zillow scraper). A session is replaced only if this fails |
 | `unified-search-runner.ts` | `runUnifiedSearch`: the create-then-poll loop. It waits for `complete` within the deadline, reports progress after each request (the `poll N` log lines), and reports blocks, network errors and bad responses |
 | `page-scripts.ts` | Functions that run inside the Skyscanner page, so requests use the browser's cookies: <br>• airport-id lookup from the search page <br>• one create or poll request, with results merged by id <br>• collecting the merged results |
 | `itinerary.ts` | The public result types: `Itinerary`, `FlightLeg`, `FlightSegment`, `BookingOption`, `SortOrder` |
