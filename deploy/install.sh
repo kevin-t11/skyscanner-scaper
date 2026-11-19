@@ -38,4 +38,4 @@ sudo systemctl enable -q skyscanner
 sudo systemctl restart skyscanner
 
 echo "==> deployed $(git rev-parse --short HEAD) · the browser needs ~10-20 s to warm up"
-echo "    check: bash deploy/check.sh · logs: journalctl -u skyscanner -f"
+echo "    check: bash deploy/check.sh · logs: bash deploy/logs.sh"

@@ -82,6 +82,11 @@ export class SessionPool {
    * Runs `work` with the session's page to itself: only when no search is using it, and no new
    * search gets it until `work` ends. Returns false when the session is busy or `work` fails; then the caller must retire it.
    */
+  /** True when another warm session could take a search right away (retrying there beats solving). */
+  hasOtherReadySession(session: BrowserSession): boolean {
+    return [...this.sessions].some((other) => other !== session && other.isUsable);
+  }
+
   async runExclusive(session: BrowserSession, work: (browser: ChromeBrowser) => Promise<boolean>): Promise<boolean> {
     if (!session.isUsable || session.inflight > 0) return false;
     session.state = "exclusive";
@@ -165,8 +170,10 @@ export class SessionPool {
       const landedOn = new URL(landedUrl).host;
       // Some proxy IPs are redirected to another market (e.g. www.skyscanner.com, priced in USD).
       if (landedOn !== config.skyscannerHost) throw new Error(`redirected to ${landedOn}`);
-      // An unsolved challenge page is still a usable origin: the sensor runs there too.
-      if (isChallengeUrl(landedUrl)) await solvePressAndHold(browser, createLogger(`session ${id}`));
+      // An unsolved (or timed-out) challenge must not be published: its solver may still drive the page.
+      if (isChallengeUrl(landedUrl) && !(await solvePressAndHold(browser, createLogger(`session ${id}`)))) {
+        throw new Error("challenge page not solved");
+      }
       this.warmingBrowsers.delete(browser);
       if (this.stopped) throw new Error("pool stopped");
 

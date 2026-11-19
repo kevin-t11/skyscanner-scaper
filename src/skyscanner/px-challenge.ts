@@ -9,6 +9,8 @@ import { formatDuration, type Logger } from "../logging/logger";
 const HOLD_BUTTON = "#px-captcha";
 const BUTTON_WAIT_MS = 8_000;
 const RELEASE_WAIT_MS = 8_000;
+/** Hard cap for one attempt; a stuck page (slow proxy, busy CPU) must not hold a search for minutes. */
+const SOLVE_TIMEOUT_MS = 30_000;
 
 const jitter = (spread: number) => (Math.random() * 2 - 1) * spread;
 const between = (min: number, max: number) => min + Math.random() * (max - min);
@@ -17,6 +19,21 @@ export const isChallengeUrl = (url: string) => url.includes("/captcha");
 
 /** Returns true when the page left the challenge. Opens `challengeUrl` first when given. */
 export async function solvePressAndHold(browser: ChromeBrowser, log: Logger, challengeUrl?: string): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<false>((resolve) => {
+    timer = setTimeout(() => {
+      log.warn(`px challenge gave up after ${formatDuration(SOLVE_TIMEOUT_MS)}`);
+      resolve(false);
+    }, SOLVE_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([attemptPressAndHold(browser, log, challengeUrl), timedOut]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function attemptPressAndHold(browser: ChromeBrowser, log: Logger, challengeUrl?: string): Promise<boolean> {
   const startedAt = performance.now();
   if (challengeUrl) await browser.navigate(challengeUrl);
 

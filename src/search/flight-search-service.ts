@@ -80,7 +80,8 @@ export class FlightSearchService implements FlightSearch {
         if (!retryable) throw error;
         // A "Press & Hold" page is solved once per request, only while no other search uses the page
         // (solving navigates it); on success the same session is kept.
-        if (error instanceof SessionBlockedError && error.challengeUrl && !challengeTried) {
+        // Only worth it when no other warm session exists: solving takes ~15-30 s, a retry elsewhere a few.
+        if (error instanceof SessionBlockedError && error.challengeUrl && !challengeTried && !this.pool.hasOtherReadySession(session)) {
           challengeTried = true;
           const challengeUrl = error.challengeUrl;
           const solved = await this.pool.runExclusive(session, (browser) => solvePressAndHold(browser, log, challengeUrl));
