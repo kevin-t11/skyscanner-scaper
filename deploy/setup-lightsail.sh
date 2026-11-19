@@ -107,7 +107,7 @@ sudo systemctl restart skyscanner
 echo "17 3 * * * $APP_USER find $APP_DIR/output -name '*.json' -mtime +7 -delete" | sudo tee /etc/cron.d/skyscanner-output >/dev/null
 
 if [ -n "${DOMAIN:-}" ]; then
-  step "Caddy HTTPS for $DOMAIN"
+  step "Caddy reverse proxy for $DOMAIN"
   if ! command -v caddy >/dev/null; then
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq debian-keyring debian-archive-keyring apt-transport-https >/dev/null
     curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/gpg.key | sudo gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
