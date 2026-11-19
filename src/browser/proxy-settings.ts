@@ -12,9 +12,11 @@ export interface ProxySettings {
  */
 export function parseProxyUrl(proxyUrl: string): ProxySettings {
   const [, scheme = "http", rest = proxyUrl] = /^([a-z0-9]+):\/\/(.*)$/i.exec(proxyUrl) ?? [];
-  // Dashboard form: the second field is the port; the password may contain `:` or `@`.
+  // URL form when the part after the last `@` is `host:port`; otherwise the dashboard form,
+  // whose second field is the port and whose password may contain `:` or `@`.
+  const isUrlForm = /@(\[[^\]]+\]|[^:@]+):\d+$/.test(rest);
   const [host, port, username, ...password] = rest.split(":");
-  if (host && port && /^\d+$/.test(port) && username !== undefined && password.length) {
+  if (!isUrlForm && host && port && /^\d+$/.test(port) && username !== undefined && password.length) {
     return { server: `${scheme}://${host}:${port}`, username, password: password.join(":") };
   }
   const url = URL.canParse(proxyUrl) ? new URL(proxyUrl) : undefined;

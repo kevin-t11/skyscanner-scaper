@@ -29,6 +29,12 @@ describe("proxy settings", () => {
   test("keeps @ in a dashboard-form password and parses IPv6 URLs", () => {
     expect(parseProxyUrl("proxy.example.com:1000:user:p@ss")).toMatchObject({ server: "http://proxy.example.com:1000", password: "p@ss" });
     expect(parseProxyUrl("http://user:pass@[::1]:8080")).toEqual({ server: "http://[::1]:8080", username: "user", password: "pass" });
+    expect(parseProxyUrl("http://user:123:secret@proxy.example.com:1000")).toEqual({
+      server: "http://proxy.example.com:1000",
+      username: "user",
+      password: "123:secret",
+    });
+    expect(parseProxyUrl("http://proxy.example.com:1000:user:p@ss")).toMatchObject({ server: "http://proxy.example.com:1000", password: "p@ss" });
   });
 
   test("explains an unparseable PROXY_URL", () => {
