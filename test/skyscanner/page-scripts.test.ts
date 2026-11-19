@@ -72,7 +72,13 @@ test("reports a network failure as httpStatus 0 and keeps earlier results", asyn
     throw new TypeError("Failed to fetch");
   }) as unknown as typeof fetch;
   const outcome = await runUnifiedSearchInPage(searchArgs());
-  expect(outcome).toMatchObject({ httpStatus: 0, complete: false, resultCount: 1 });
+  expect(outcome).toMatchObject({ httpStatus: 0, failure: "network", complete: false, resultCount: 1 });
+});
+
+test("reports invalid JSON in a 200 response as malformed, not a network failure", async () => {
+  globalThis.fetch = (async () => new Response("<html>oops</html>", { status: 200 })) as unknown as typeof fetch;
+  const outcome = await runUnifiedSearchInPage(searchArgs());
+  expect(outcome).toMatchObject({ httpStatus: 200, failure: "malformed", complete: false, resultCount: 0, upstreamRequests: 1 });
 });
 
 describe("lookupRouteEntitiesInPage", () => {

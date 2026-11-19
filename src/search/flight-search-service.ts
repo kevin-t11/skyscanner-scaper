@@ -163,7 +163,10 @@ export class FlightSearchService implements FlightSearch {
       // Blocked before any results: retry elsewhere. Blocked mid-search: keep what we have, retire the session.
       if (outcome.resultCount === 0) throw new SessionBlockedError("search API returned 403");
       this.pool.retire(session, "search API returned 403 mid-search");
-    } else if (outcome.httpStatus === 0) {
+    } else if (outcome.failure === "malformed") {
+      // Skyscanner's fault, not the session's: keep the session and any results already merged.
+      if (outcome.resultCount === 0) throw new UpstreamError("search API returned invalid JSON");
+    } else if (outcome.failure === "network") {
       if (outcome.resultCount === 0) throw new SessionNetworkError("search API unreachable: network error");
       this.pool.retire(session, "search API network error mid-search");
     } else if (outcome.httpStatus !== 200) {

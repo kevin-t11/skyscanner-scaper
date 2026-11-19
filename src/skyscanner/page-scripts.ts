@@ -62,6 +62,8 @@ export interface UnifiedSearchArgs {
 export interface UnifiedSearchOutcome {
   /** Last HTTP status; 403 means PerimeterX rejected this browser session, 0 a network failure. */
   httpStatus: number;
+  /** Why polling stopped early: the request failed, or a 200 response was not valid JSON. */
+  failure?: "network" | "malformed";
   complete: boolean;
   /** True when the deadline ended the search before Skyscanner reported `complete`. */
   timedOut: boolean;
@@ -91,19 +93,27 @@ export async function runUnifiedSearchInPage(args: UnifiedSearchArgs): Promise<U
   let upstreamRequests = 0;
   let firstResultsMs: number | null = null;
   let timedOut = false;
+  let failure: UnifiedSearchOutcome["failure"];
   const deadline = new AbortController();
   const deadlineTimer = setTimeout(() => deadline.abort(), args.deadlineMs);
 
   const request = async (url: string, init: RequestInit): Promise<number> => {
     upstreamRequests++;
+    let response: Response;
     let data: UnifiedSearchResponse;
     try {
-      const response = await fetch(url, { ...init, credentials: "include", headers: args.headers, signal: deadline.signal });
+      response = await fetch(url, { ...init, credentials: "include", headers: args.headers, signal: deadline.signal });
       if (response.status !== 200) return response.status;
+    } catch {
+      if (deadline.signal.aborted) timedOut = true;
+      else failure = "network";
+      return deadline.signal.aborted ? 200 : 0;
+    }
+    try {
       data = await response.json();
     } catch {
-      if (!deadline.signal.aborted) return 0;
-      timedOut = true;
+      if (deadline.signal.aborted) timedOut = true;
+      else failure = "malformed";
       return 200;
     }
     context = data.context ?? {};
@@ -114,7 +124,7 @@ export async function runUnifiedSearchInPage(args: UnifiedSearchArgs): Promise<U
   };
 
   let httpStatus = await request(args.endpoint, { method: "POST", body: JSON.stringify(args.body) });
-  while (httpStatus === 200 && !timedOut && context.status !== "complete" && context.sessionId) {
+  while (httpStatus === 200 && !failure && !timedOut && context.status !== "complete" && context.sessionId) {
     if (args.stopWhenEnough && resultsById.size >= args.enoughResults) break;
     if (performance.now() - startedAt + args.pollIntervalMs > args.deadlineMs) {
       timedOut = true;
@@ -128,6 +138,7 @@ export async function runUnifiedSearchInPage(args: UnifiedSearchArgs): Promise<U
   const payload: UnifiedSearchPayload = { results: [...resultsById.values()], agents: [...agentsById.values()] };
   return {
     httpStatus,
+    failure,
     complete: !timedOut && context.status === "complete",
     timedOut,
     upstreamRequests,
