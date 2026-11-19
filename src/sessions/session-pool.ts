@@ -8,6 +8,7 @@ import { proxyForSession } from "../browser/proxy-settings";
 import type { AppConfig } from "../config/app-config";
 import { NoSessionAvailableError } from "../errors";
 import { createLogger, formatDuration } from "../logging/logger";
+import { isChallengeUrl, solvePressAndHold } from "../skyscanner/px-challenge";
 import { BrowserSession } from "./browser-session";
 
 const LAUNCH_RETRY_BACKOFF_MS = [1_000, 5_000, 15_000, 60_000];
@@ -120,10 +121,12 @@ export class SessionPool {
       this.warmingBrowsers.add(browser);
       if (this.stopped) throw new Error("pool stopped");
       // Landing on the home page lets PerimeterX's sensor run and set its cookies.
-      // A captcha page is still a usable origin: the sensor runs there too.
-      const landedOn = new URL(await browser.navigate(`${this.origin}/`)).host;
+      const landedUrl = await browser.navigate(`${this.origin}/`);
+      const landedOn = new URL(landedUrl).host;
       // Some proxy IPs are redirected to another market (e.g. www.skyscanner.com, priced in USD).
       if (landedOn !== config.skyscannerHost) throw new Error(`redirected to ${landedOn}`);
+      // An unsolved challenge page is still a usable origin: the sensor runs there too.
+      if (isChallengeUrl(landedUrl)) await solvePressAndHold(browser, createLogger(`session ${id}`));
       this.warmingBrowsers.delete(browser);
       if (this.stopped) throw new Error("pool stopped");
 

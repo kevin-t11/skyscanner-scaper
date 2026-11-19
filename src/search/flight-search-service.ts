@@ -7,6 +7,7 @@ import type { SessionPool } from "../sessions/session-pool";
 import type { Itinerary, SortOrder } from "../skyscanner/itinerary";
 import { rankItineraries, type ItineraryCounts } from "../skyscanner/itinerary-normalizer";
 import { lookupRouteEntitiesInPage, toPageExpression, type RouteLookupResult } from "../skyscanner/page-scripts";
+import { isChallengeUrl, solvePressAndHold } from "../skyscanner/px-challenge";
 import { parseSearchUrl, type FlightSearchQuery, type ParsedSearchUrl } from "../skyscanner/search-url";
 import {
   buildUnifiedSearchBody,
@@ -63,6 +64,7 @@ export class FlightSearchService implements FlightSearch {
     const startedAt = performance.now();
     const parsedUrl = parseSearchUrl(request.searchUrl);
 
+    let challengeTried = false;
     for (let attempt = 1; ; attempt++) {
       const session = await this.pool.acquire();
       log.info(`session ${session.id} acquired${attempt > 1 ? ` (retry ${attempt - 1})` : ""}`);
@@ -74,6 +76,16 @@ export class FlightSearchService implements FlightSearch {
         const retryable =
           error instanceof SessionBlockedError || error instanceof SessionNetworkError || error instanceof BrowserError;
         if (!retryable) throw error;
+        // A "Press & Hold" page is solved once per request; on success the same session is kept.
+        if (error instanceof SessionBlockedError && error.challengeUrl && !challengeTried) {
+          challengeTried = true;
+          const challengeUrl = error.challengeUrl;
+          const solved = await session.run((browser) => solvePressAndHold(browser, log, challengeUrl)).catch(() => false);
+          if (solved) {
+            attempt--;
+            continue;
+          }
+        }
         log.warn(`session ${session.id} failed: ${(error as Error).message}`);
         this.pool.retire(session, (error as Error).message);
         if (attempt >= MAX_ATTEMPTS) {
@@ -131,7 +143,8 @@ export class FlightSearchService implements FlightSearch {
     );
     if (lookup.failure === "timeout") throw new UpstreamError(`route lookup timed out after ${ROUTE_LOOKUP_TIMEOUT_MS} ms`);
     if (lookup.failure === "network") throw new SessionNetworkError("route lookup failed: network error");
-    if (lookup.status === 403 || lookup.finalUrl.includes("/captcha")) throw new SessionBlockedError("search page challenged");
+    if (isChallengeUrl(lookup.finalUrl)) throw new SessionBlockedError("search page challenged", lookup.finalUrl);
+    if (lookup.status === 403) throw new SessionBlockedError("search page returned 403");
     if (!lookup.originEntityId || !lookup.destinationEntityId) {
       throw new UpstreamError(`could not resolve places "${query.from}" / "${query.to}" (HTTP ${lookup.status})`);
     }
