@@ -69,6 +69,21 @@ export class SessionPool {
     throw new NoSessionAvailableError("no browser session is ready");
   }
 
+  /**
+   * Runs `work` with the session's page to itself: only when no search is using it, and no new
+   * search gets it until `work` ends. Returns false when the session is busy or `work` fails.
+   */
+  async runExclusive(session: BrowserSession, work: (browser: ChromeBrowser) => Promise<boolean>): Promise<boolean> {
+    if (!session.isUsable || session.inflight > 0) return false;
+    session.state = "exclusive";
+    try {
+      return await session.run(work).catch(() => false);
+    } finally {
+      if (session.state === "exclusive") session.state = "ready";
+      this.notifyReady();
+    }
+  }
+
   /** Retires a session and launches a replacement with a new proxy IP. */
   retire(session: BrowserSession, reason: string): void {
     if (!this.sessions.delete(session)) return;

@@ -76,11 +76,12 @@ export class FlightSearchService implements FlightSearch {
         const retryable =
           error instanceof SessionBlockedError || error instanceof SessionNetworkError || error instanceof BrowserError;
         if (!retryable) throw error;
-        // A "Press & Hold" page is solved once per request; on success the same session is kept.
+        // A "Press & Hold" page is solved once per request, only while no other search uses the page
+        // (solving navigates it); on success the same session is kept.
         if (error instanceof SessionBlockedError && error.challengeUrl && !challengeTried) {
           challengeTried = true;
           const challengeUrl = error.challengeUrl;
-          const solved = await session.run((browser) => solvePressAndHold(browser, log, challengeUrl)).catch(() => false);
+          const solved = await this.pool.runExclusive(session, (browser) => solvePressAndHold(browser, log, challengeUrl));
           if (solved) {
             attempt--;
             continue;
