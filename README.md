@@ -214,28 +214,15 @@ PROXY_URL=http://USERNAME:PASSWORD_country-IN_session-{session}_lifetime-30@rp.e
 
 ## Deploy (AWS Lightsail / any Ubuntu server)
 
-The full release procedure (upload, staged test, backup, rollback, Caddy) is in [DEPLOYMENT.md](DEPLOYMENT.md).
+On the server, from a clone of this repository:
 
-`deploy/setup-lightsail.sh` sets everything up in one run: Google Chrome, Xvfb (virtual display for the
-headful browser), Bun, a 2 GB swap file on small instances, the code, `.env`, a `skyscanner` systemd service,
-and a daily cleanup of `output/` files older than 7 days. Re-running it updates the code and restarts the service.
+```bash
+bash deploy/install.sh     # 1st run: installs xvfb, Chrome, Bun and creates .env (generated API_KEY)
+nano .env                  # set PROXY_URL and POOL_SIZE
+bash deploy/install.sh     # runs the tests, installs and starts the `skyscanner` service
+```
 
-1. Create an Ubuntu 22.04/24.04 instance: at least 2 GB RAM for `POOL_SIZE=1`, plus about 700 MB per extra browser.
-2. SSH in and run the script twice: the first run creates `.env` (with a generated `API_KEY`) and stops so you
-   can set `PROXY_URL` and `POOL_SIZE` in it; the second run installs and starts everything.
-   ```bash
-   git clone https://github.com/kevin-t11/skyscanner-scaper.git ~/skyscanner-scaper && cd ~/skyscanner-scaper
-   bash deploy/setup-lightsail.sh
-   nano .env
-   DOMAIN=:80 bash deploy/setup-lightsail.sh
-   ```
-   Script options (not scraper settings): `BRANCH=...`, and `DOMAIN` to add Caddy in front:
-   `DOMAIN=:80` serves the API on the server's IP over HTTP (open port 80 in the Lightsail firewall);
-   `DOMAIN=api.example.com` adds automatic HTTPS (open ports 80 and 443).
-3. Check it: `curl localhost:8000/health`, logs with `journalctl -u skyscanner -f`.
-
-The API listens on localhost only. Call it from the same machine, through Caddy (`DOMAIN`), or over an SSH
-tunnel: `ssh -L 8000:localhost:8000 ubuntu@<server-ip>`.
+Updates: `git pull && bash deploy/install.sh`. Full guide (rollback, verification, operations): [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Troubleshooting
 | Symptom | Fix |
@@ -308,8 +295,9 @@ What each folder and file is for, in the order a `/url` request passes through t
 | `bun.lock` | Locked dependency versions |
 | `tsconfig.json` | TypeScript settings (strict mode) |
 | `.env.example` | Every setting with a comment; copy it to `.env` (the only place settings are read from) |
-| `DEPLOYMENT.md` | Lightsail release procedure: first-time setup, upload, staged test, backup, restart, verify, rollback |
-| `deploy/setup-lightsail.sh` | One-shot Ubuntu/Lightsail setup: Chrome, Xvfb, Bun, swap, code, `.env`, systemd service, output cleanup, optional Caddy HTTPS |
+| `DEPLOYMENT.md` | Lightsail deployment: first install, update, rollback, verification, operations |
+| `deploy/install.sh` | Installs xvfb, Chrome and Bun, creates `.env` on the first run, runs the tests, installs and restarts the `skyscanner` service |
+| `deploy/skyscanner.service` | systemd unit template used by `install.sh` |
 | `.gitignore` | Keeps `.env`, `node_modules/`, HAR captures and `/output/` out of git |
 | `README.md` | This guide |
 | `docs/DESIGN.md` | Research notes: how Skyscanner's API and PerimeterX work, design choices, measured speed and cost |

@@ -1,0 +1,18 @@
+[Unit]
+Description=Skyscanner scraper
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+User=__USER__
+WorkingDirectory=__APP_DIR__
+# Headful Chrome needs a display; xvfb-run provides a virtual one.
+ExecStart=/usr/bin/xvfb-run -a __BUN__ src/main.ts
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
