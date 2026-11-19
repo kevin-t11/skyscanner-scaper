@@ -12,5 +12,8 @@ export class SessionBlockedError extends Error {}
 /** Skyscanner answered, but not with usable results. */
 export class UpstreamError extends Error {}
 
+/** A script running in the page threw (e.g. its fetch failed); Chrome itself still works. */
+export class PageScriptError extends UpstreamError {}
+
 /** Chrome or its DevTools connection failed. */
 export class BrowserError extends Error {}

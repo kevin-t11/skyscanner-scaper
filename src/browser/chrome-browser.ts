@@ -9,7 +9,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Subprocess } from "bun";
-import { BrowserError } from "../errors";
+import { BrowserError, PageScriptError } from "../errors";
 import { CdpConnection } from "./cdp-connection";
 import type { CdpCommands, CdpMethod, ResourceType } from "./cdp-protocol";
 import type { ProxySettings } from "./proxy-settings";
@@ -70,7 +70,10 @@ export class ChromeBrowser {
     return this.evaluate<string>("location.href");
   }
 
-  /** Evaluates an expression in the page, awaiting promises, and returns its JSON value. */
+  /**
+   * Evaluates an expression in the page, awaiting promises, and returns its JSON value.
+   * Throws `PageScriptError` if the script throws, `BrowserError` if Chrome or CDP fails.
+   */
   async evaluate<T>(expression: string): Promise<T> {
     const { result, exceptionDetails } = await this.sendToPage("Runtime.evaluate", {
       expression,
@@ -78,7 +81,7 @@ export class ChromeBrowser {
       returnByValue: true,
     });
     if (exceptionDetails) {
-      throw new BrowserError(`page evaluation failed: ${exceptionDetails.exception?.description ?? exceptionDetails.text}`);
+      throw new PageScriptError(`page script failed: ${exceptionDetails.exception?.description ?? exceptionDetails.text}`);
     }
     return result.value as T;
   }
