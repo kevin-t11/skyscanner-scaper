@@ -12,9 +12,10 @@ import {
 } from "../errors";
 import { createLogger, formatDuration, type Logger } from "../logging/logger";
 import { saveSearchOutput } from "../output/search-output-writer";
-import type { FlightSearch, FlightSearchRequest, FlightSearchResult, SearchTimings } from "../search/flight-search-service";
+import type { FlightSearchRequest, FlightSearchResult, SearchTimings } from "../search/flight-search-service";
 import { SORT_ORDERS, type Itinerary, type SortOrder } from "../skyscanner/itinerary";
 import { parseSearchUrl, type FlightSearchQuery } from "../skyscanner/search-url";
+import type { RouteContext } from "./route-context";
 
 // ── request ──
 
@@ -191,14 +192,7 @@ function logOutcome(log: Logger, envelope: SearchEnvelope): void {
   }
 }
 
-export interface UrlRouteOptions {
-  /** When set, `/url` requires `x-api-key: <apiKey>`. */
-  apiKey?: string;
-  /** When set, every search response is also saved there as a JSON file. */
-  outputDir?: string;
-}
-
-export function createUrlRoute(search: FlightSearch, { apiKey, outputDir }: UrlRouteOptions = {}) {
+export function createUrlRoute({ search, apiKey, outputDir }: RouteContext) {
   const isAuthorized = (req: Request) => !apiKey || req.headers.get("x-api-key") === apiKey;
 
   async function finish(envelope: SearchEnvelope, requestId: string, log: Logger, code?: FailureCode): Promise<Response> {

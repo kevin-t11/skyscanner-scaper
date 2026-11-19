@@ -253,6 +253,7 @@ src/
 ├── output/search-output-writer.ts   saveSearchOutput: one JSON file per search
 ├── routes/                          every endpoint lives here, one file per route
 │   ├── index.ts                     createRoutes: the route table (add /details here later)
+│   ├── route-context.ts             RouteContext: search service, pool health, API key, output dir
 │   ├── health.route.ts              GET /health
 │   └── url.route.ts                 GET|POST /url: input validation, response envelope, handler (logging, saving)
 ├── search/flight-search-service.ts  FlightSearchService: the /url use case, route cache, retry on a fresh session
@@ -311,6 +312,7 @@ What each folder and file is for, in the order a `/url` request passes through t
 | File | What it does |
 |---|---|
 | `index.ts` | The route table: lists every endpoint and connects it to its handler. Add new endpoints here |
+| `route-context.ts` | `RouteContext`: what handlers can use (search service, pool health, API key, output folder) |
 | `health.route.ts` | `GET /health`: returns the browser pool's state |
 | `url.route.ts` | Everything for `GET` and `POST /url`, in three sections: <br>• **request**: `parseSearchRequest` checks `url`, `max`, `sort` and `fast` and applies defaults (`max=50`, `sort=best`) <br>• **response**: `SearchEnvelope`, `passEnvelope`, `failEnvelope` (`status`, `timeElapsedMs`, `request`, `result`, `failed`) <br>• **handler**: `createUrlRoute` checks `x-api-key`, assigns a request id, runs the search, logs the result and saves the JSON file |
 
