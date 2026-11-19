@@ -120,7 +120,8 @@ export class FlightSearchService implements FlightSearch {
     const lookup = await session.browser.evaluate<RouteLookupResult>(
       toPageExpression(lookupRouteEntitiesInPage, { pathAndQuery, timeoutMs: ROUTE_LOOKUP_TIMEOUT_MS }),
     );
-    if (lookup.status === 0) throw new UpstreamError(`route lookup timed out after ${ROUTE_LOOKUP_TIMEOUT_MS} ms`);
+    if (lookup.failure === "timeout") throw new UpstreamError(`route lookup timed out after ${ROUTE_LOOKUP_TIMEOUT_MS} ms`);
+    if (lookup.failure === "network") throw new UpstreamError("route lookup failed: network error");
     if (lookup.status === 403 || lookup.finalUrl.includes("/captcha")) throw new SessionBlockedError("search page challenged");
     if (!lookup.originEntityId || !lookup.destinationEntityId) {
       throw new UpstreamError(`could not resolve places "${query.from}" / "${query.to}" (HTTP ${lookup.status})`);

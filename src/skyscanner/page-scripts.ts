@@ -13,8 +13,9 @@ export const toPageExpression = <A>(pageFunction: (args: A) => unknown, args: A)
 // ---- Route lookup ----------------------------------------------------------
 
 export interface RouteLookupResult {
-  /** HTTP status of the search page; 0 when the lookup timed out. */
+  /** HTTP status of the search page; 0 when the request failed (see `failure`). */
   status: number;
+  failure?: "timeout" | "network";
   finalUrl: string;
   originEntityId?: string;
   destinationEntityId?: string;
@@ -31,8 +32,9 @@ export async function lookupRouteEntitiesInPage(args: { pathAndQuery: string; ti
   try {
     response = await fetch(args.pathAndQuery, { credentials: "include", signal: AbortSignal.timeout(args.timeoutMs) });
     html = await response.text();
-  } catch {
-    return { status: 0, finalUrl: args.pathAndQuery };
+  } catch (error) {
+    const timedOut = error instanceof DOMException && error.name === "TimeoutError";
+    return { status: 0, finalUrl: args.pathAndQuery, failure: timedOut ? "timeout" : "network" };
   }
   const firstMatch = (pattern: RegExp) => html.match(pattern)?.[1];
   return {

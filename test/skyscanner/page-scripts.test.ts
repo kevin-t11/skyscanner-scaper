@@ -81,6 +81,13 @@ describe("lookupRouteEntitiesInPage", () => {
     globalThis.fetch = (async () => {
       throw new DOMException("timed out", "TimeoutError");
     }) as unknown as typeof fetch;
-    expect((await lookupRouteEntitiesInPage({ pathAndQuery: "/x", timeoutMs: 1 })).status).toBe(0);
+    expect(await lookupRouteEntitiesInPage({ pathAndQuery: "/x", timeoutMs: 1 })).toMatchObject({ status: 0, failure: "timeout" });
+  });
+
+  test("reports a connection failure as a network failure", async () => {
+    globalThis.fetch = (async () => {
+      throw new TypeError("Failed to fetch");
+    }) as unknown as typeof fetch;
+    expect(await lookupRouteEntitiesInPage({ pathAndQuery: "/x", timeoutMs: 1_000 })).toMatchObject({ status: 0, failure: "network" });
   });
 });
