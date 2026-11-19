@@ -36,7 +36,7 @@ export class SessionPool {
 
   constructor(private readonly config: AppConfig) {}
 
-  /** `https://<SKYSCANNER_HOST>`: the origin every session's page is on. */
+  /** The Skyscanner origin every session's page is on. */
   get origin(): string {
     return `https://${this.config.skyscannerHost}`;
   }

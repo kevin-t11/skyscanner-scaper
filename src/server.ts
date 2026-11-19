@@ -11,7 +11,7 @@ export function createHttpServer(search: RouteContext["search"], poolHealth: Rou
   return Bun.serve({
     port,
     hostname,
-    // Complete searches take up to SEARCH_DEADLINE_MS; Bun's default idle timeout is 10 s.
+    // Complete searches take up to the 12 s search deadline; Bun's default idle timeout is 10 s.
     idleTimeout: 60,
     routes: createRoutes({ search, poolHealth, ...routeOptions }),
     fetch: () => Response.json({ error: "not found" }, { status: 404 }),

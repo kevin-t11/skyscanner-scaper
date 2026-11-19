@@ -68,7 +68,7 @@ Why each choice:
 | URL → entity ids (in-page fetch of the search page) | ~430 ms, then 0 (cached per route) |
 | `fast=true`, `max` ≤ 10 | ~1.3 s (create + 1 poll) |
 | First 50+ itineraries | 0.9–1.7 s |
-| `complete` (all agents answered) | 8–12 s; `SEARCH_DEADLINE_MS` caps it (default 12 s) |
+| `complete` (all agents answered) | 8–12 s; capped by the 12 s search deadline (`SEARCH_DEADLINE_MS` in `src/config/app-config.ts`) |
 
 ## Cost (estimate)
 - A full poll for 943 itineraries is ~490 KB gzip on the wire; early polls are smaller. With the 600 ms poll interval a

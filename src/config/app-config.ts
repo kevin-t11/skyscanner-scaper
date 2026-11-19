@@ -1,9 +1,32 @@
-/** Runtime configuration, read once from the environment. */
-import { parseLoggingEnabled, parseLogLevel, type LogLevel } from "../logging/logger";
+/**
+ * Runtime configuration. Only what changes between machines comes from the environment
+ * (`PROXY_URL`, `PORT`, `POOL_SIZE`, `API_KEY`, `LOGGING`, optional `CHROME_PATH`);
+ * everything else is a fixed setting below.
+ */
+import { existsSync } from "node:fs";
+import { parseLoggingEnabled } from "../logging/logger";
+
+/** Skyscanner site and market every session uses; results are priced in this currency. */
+const SKYSCANNER_SITE = { host: "www.skyscanner.co.in", market: "IN", locale: "en-GB", currency: "INR" } as const;
+
+/** Upper bound for one search, including all polls; partial results are returned after it. */
+const SEARCH_DEADLINE_MS = 12_000;
+
+/** Where each `/url` response is saved as JSON. */
+const OUTPUT_DIR = "output";
+
+/** Used when `CHROME_PATH` is not set: the first one that exists. */
+const CHROME_CANDIDATES = [
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "/usr/bin/google-chrome",
+  "/usr/bin/google-chrome-stable",
+  "/usr/bin/chromium",
+  "/usr/bin/chromium-browser",
+];
 
 export interface AppConfig {
   port: number;
-  /** Interface to listen on; localhost by default because every search spends proxy bandwidth. */
+  /** Always localhost: every search spends proxy bandwidth, so the API is not exposed. */
   hostname: string;
   /** When set, `/url` requires `x-api-key: <apiKey>`. */
   apiKey: string | undefined;
@@ -12,19 +35,16 @@ export interface AppConfig {
   /** `http://user:pass@host:port`; `{session}` is replaced with a per-browser id. */
   proxyUrl: string | undefined;
   chromePath: string;
+  /** Always false: Skyscanner's search API blocks headless Chrome. */
   headless: boolean;
-  /** Skyscanner site the sessions use, e.g. `www.skyscanner.co.in`. */
   skyscannerHost: string;
   market: string;
   locale: string;
   currency: string;
-  /** Upper bound for one search, including all polls. */
   searchDeadlineMs: number;
-  /** Where each `/url` response is saved as JSON; `undefined` disables saving. */
-  outputDir: string | undefined;
+  outputDir: string;
   /** `LOGGING=enabled|disabled`; default enabled. */
   loggingEnabled: boolean;
-  logLevel: LogLevel;
 }
 
 type Env = Record<string, string | undefined>;
@@ -34,23 +54,23 @@ const positiveInt = (value: string | undefined, fallback: number): number => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
+const findChrome = () => CHROME_CANDIDATES.find((path) => existsSync(path)) ?? "google-chrome";
+
 export function loadAppConfig(env: Env = process.env): AppConfig {
   return {
     port: positiveInt(env.PORT, 8000),
-    hostname: env.HOST || "127.0.0.1",
+    hostname: "127.0.0.1",
     apiKey: env.API_KEY || undefined,
-    poolSize: positiveInt(env.POOL_SIZE, 2),
+    poolSize: positiveInt(env.POOL_SIZE, 1),
     proxyUrl: env.PROXY_URL || undefined,
-    chromePath: env.CHROME_PATH || "google-chrome",
-    headless: env.HEADLESS === "true",
-    skyscannerHost: env.SKYSCANNER_HOST || "www.skyscanner.com",
-    market: env.MARKET || "US",
-    locale: env.LOCALE || "en-US",
-    currency: env.CURRENCY || "USD",
-    searchDeadlineMs: positiveInt(env.SEARCH_DEADLINE_MS, 12_000),
-    // Unset → ./output; set to an empty string to disable saving.
-    outputDir: env.OUTPUT_DIR === undefined ? "output" : env.OUTPUT_DIR || undefined,
+    chromePath: env.CHROME_PATH || findChrome(),
+    headless: false,
+    skyscannerHost: SKYSCANNER_SITE.host,
+    market: SKYSCANNER_SITE.market,
+    locale: SKYSCANNER_SITE.locale,
+    currency: SKYSCANNER_SITE.currency,
+    searchDeadlineMs: SEARCH_DEADLINE_MS,
+    outputDir: OUTPUT_DIR,
     loggingEnabled: parseLoggingEnabled(env.LOGGING),
-    logLevel: parseLogLevel(env.LOG_LEVEL),
   };
 }

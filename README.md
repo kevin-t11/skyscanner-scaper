@@ -43,16 +43,7 @@ bun install
 cp .env.example .env
 ```
 
-Edit `.env`. For India with no proxy, on your home connection:
-```bash
-CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-SKYSCANNER_HOST=www.skyscanner.co.in
-MARKET=IN
-LOCALE=en-GB
-CURRENCY=INR
-POOL_SIZE=1
-PROXY_URL=
-```
+`.env` works as is on your own connection (no proxy). Chrome is found automatically.
 
 Then:
 ```bash
@@ -72,7 +63,7 @@ curl -s -G localhost:8000/url \
 ```bash
 sudo apt install -y xvfb google-chrome-stable   # or chromium
 bun install
-cp .env.example .env                             # set PROXY_URL, SKYSCANNER_HOST, MARKET/LOCALE/CURRENCY
+cp .env.example .env                             # set PROXY_URL
 xvfb-run -a bun start
 ```
 
@@ -80,23 +71,22 @@ To run it as a service, put `xvfb-run -a bun src/main.ts` in a systemd unit or a
 Stop it with Ctrl-C or `SIGTERM`; browsers are closed cleanly.
 
 ## Configuration
-Set these in `.env` (Bun loads it automatically) or in the environment.
+Only these come from `.env` (Bun loads it automatically) or the environment:
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `PROXY_URL` | none | `http://user:pass@host:port`; `{session}` is replaced per browser so each one keeps a sticky IP |
-| `POOL_SIZE` | `2` | Browser sessions (one IP each, ~300–700 MB RAM each) |
-| `SKYSCANNER_HOST` | `www.skyscanner.com` | Site the sessions use; results use its market |
-| `MARKET` / `LOCALE` / `CURRENCY` | `US` / `en-US` / `USD` | Must match the host, e.g. `IN` / `en-GB` / `INR` for `.co.in` |
-| `SEARCH_DEADLINE_MS` | `12000` | Maximum time to wait for Skyscanner to finish; partial results are returned after that |
-| `CHROME_PATH` | `google-chrome` | Chrome binary |
-| `HEADLESS` | `false` | Headless Chrome is blocked by the search API; use only for debugging |
-| `PORT` | `8000` | HTTP port |
-| `HOST` | `127.0.0.1` | Listen address; use `0.0.0.0` only together with `API_KEY` |
+| `PORT` | `8000` | HTTP port; the server listens on `localhost` only |
+| `POOL_SIZE` | `1` | Browser sessions (one IP and ~300–700 MB RAM each); raise it for parallel searches |
 | `API_KEY` | none | When set, `/url` requires the `x-api-key` header |
-| `OUTPUT_DIR` | `output` | Where every search response is saved as JSON; set it empty (`OUTPUT_DIR=`) to turn saving off |
 | `LOGGING` | `enabled` | `enabled` prints the server logs; `disabled` turns them all off |
-| `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` (when `LOGGING` is enabled) |
+| `CHROME_PATH` | found automatically | Only needed if Chrome is installed somewhere unusual |
+
+Fixed settings, changed in <code>src/config/app-config.ts</code> if ever needed:
+- **Site:** `www.skyscanner.co.in`, market `IN`, locale `en-GB`, prices in `INR`.
+- **Search deadline:** 12 s; partial results are returned after that.
+- **Output folder:** `output/`.
+- **Browser:** headful Chrome, because the search API blocks headless Chrome.
 
 ## API
 
@@ -204,10 +194,10 @@ Search lines are tagged with the request id and the time since the request arriv
 | `[pool] session … retired` | A session was blocked or broke and is being replaced with a new IP |
 
 To keep logs in a file: `bun start 2>&1 | tee -a logs/server.log`. To turn logs off: `LOGGING=disabled`.
-Output files are still saved when logging is off; they are controlled by `OUTPUT_DIR`.
+Output files are still saved when logging is off.
 
 ## Output files
-Every `/url` search response is saved to `OUTPUT_DIR` (default `output/`, which git ignores), named
+Every `/url` search response is saved to `output/` (git ignores it), named
 `{date-time}_{from}-{to}_{sort}_{pass|fail}_{request id}.json`, for example
 `output/20261119-172614_blr-del_cheapest_pass_892d46.json`. The file contains exactly the JSON response.
 Requests rejected before a search starts (wrong API key, a body that isn't JSON) are logged but not saved.
@@ -228,10 +218,10 @@ PROXY_URL=http://USERNAME:PASSWORD_country-IN_session-{session}_lifetime-30@rp.e
 | Symptom | Fix |
 |---|---|
 | `no_session` right after start | Wait for `first browser session ready`; the first session takes about 5–7 s |
-| `[pool] session … failed to start: … ENOENT` | Set `CHROME_PATH` to your Chrome binary |
-| `blocked` on every search | The IP is flagged: use a residential proxy, keep `HEADLESS=false`, and on a server run under `xvfb-run` |
+| `[pool] session … failed to start: … ENOENT` | Chrome wasn't found: set `CHROME_PATH` to your Chrome binary |
+| `blocked` on every search | The IP is flagged: use a residential proxy, and on a server run under `xvfb-run` |
 | `upstream_error: could not resolve places` | The URL's airport or city codes are wrong, or the site has no page for that route |
-| `upstream_error: … no results within 12000 ms` | Skyscanner was slow: raise `SEARCH_DEADLINE_MS` or use `fast=true` |
+| `upstream_error: … no results within 12000 ms` | Skyscanner was slow: retry, or use `fast=true` |
 | Searches slow on large routes | Use `fast=true` and a smaller `max`; first results arrive in about 1–3 s |
 | Port already in use | Change `PORT`, or stop the old server (`pkill -f "bun src/main.ts"`) |
 
@@ -240,7 +230,7 @@ PROXY_URL=http://USERNAME:PASSWORD_country-IN_session-{session}_lifetime-30@rp.e
 routes/url → parseSearchRequest → FlightSearchService.search
          → SessionPool.acquire (least-busy warmed Chrome) → resolveRoute (airport ids, cached)
          → runUnifiedSearch (create + poll, one in-page fetch per step, logged) → rankItineraries
-         → SearchEnvelope → saved to OUTPUT_DIR
+         → SearchEnvelope → saved to output/
 ```
 
 ```
@@ -348,9 +338,9 @@ What each folder and file is for, in the order a `/url` request passes through t
 ### `src/config/`, `src/logging/`, `src/output/`
 | File | What it does |
 |---|---|
-| `config/app-config.ts` | `loadAppConfig`: reads every environment variable once, with defaults (`PORT=8000`, `HOST=127.0.0.1`, …) |
-| `logging/logger.ts` | `createLogger`: compact log lines (`time LEVEL [scope +elapsed] message`), `LOGGING` and `LOG_LEVEL` switches, and escaping so input can't forge log lines |
-| `output/search-output-writer.ts` | `saveSearchOutput`: writes each response to `OUTPUT_DIR` as `{time}_{from}-{to}_{sort}_{pass\|fail}_{id}.json` |
+| `config/app-config.ts` | `loadAppConfig`: reads the few environment variables and holds the fixed settings (site, deadline, output folder, Chrome lookup) |
+| `logging/logger.ts` | `createLogger`: compact log lines (`time LEVEL [scope +elapsed] message`), the `LOGGING` switch, and escaping so input can't forge log lines |
+| `output/search-output-writer.ts` | `saveSearchOutput`: writes each response to `output/` as `{time}_{from}-{to}_{sort}_{pass\|fail}_{id}.json` |
 
 ### `test/` (`bun test`, no network needed)
 | File | What it tests |

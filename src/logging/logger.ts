@@ -6,15 +6,12 @@ export type LogLevel = "debug" | "info" | "warn" | "error";
 
 const LEVEL_RANK: Record<LogLevel, number> = { debug: 10, info: 20, warn: 30, error: 40 };
 
-export const parseLogLevel = (value: string | undefined): LogLevel =>
-  value && value in LEVEL_RANK ? (value as LogLevel) : "info";
-
 /** `LOGGING=disabled` (or `false` / `off` / `0`) turns all logs off; anything else, or unset, keeps them on. */
 export const parseLoggingEnabled = (value: string | undefined): boolean =>
   !["disabled", "false", "off", "0"].includes((value ?? "").trim().toLowerCase());
 
-let minimumLevel: LogLevel = parseLogLevel(process.env.LOG_LEVEL);
-let loggingEnabled = parseLoggingEnabled(process.env.LOGGING);
+let minimumLevel: LogLevel = "info";
+let loggingEnabled = true;
 
 export function setLogLevel(level: LogLevel): void {
   minimumLevel = level;
