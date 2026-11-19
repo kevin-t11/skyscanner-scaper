@@ -100,7 +100,7 @@ export class FlightSearchService implements FlightSearch {
     const { total, itineraries } = rankItineraries(outcome.payloadJson, request.sort, request.maxItems, this.pool.origin);
     const stoppedBy = outcome.complete ? "complete" : outcome.timedOut ? "deadline reached" : request.fast ? "fast mode" : "partial";
     log.info(
-      `${stoppedBy} · ${total} flights in ${outcome.upstreamRequests} requests · search ${formatDuration(outcome.elapsedMs)}` +
+      `${stoppedBy} · ${total} flights in ${outcome.upstreamRequests} request${outcome.upstreamRequests === 1 ? "" : "s"} · search ${formatDuration(outcome.elapsedMs)}` +
         (outcome.firstResultsMs === null ? "" : `, first results ${formatDuration(outcome.firstResultsMs)}`),
     );
     return {
@@ -171,10 +171,10 @@ export class FlightSearchService implements FlightSearch {
         deadlineMs: searchDeadlineMs,
         pollIntervalMs: POLL_INTERVAL_MS,
       },
-      ({ step, status, resultCount, newResults, elapsedMs }) => {
+      ({ step, status, resultCount, newResults }) => {
         const label = step === 1 ? "search created" : `poll ${step}`;
         const delta = step === 1 ? "" : ` (+${newResults})`;
-        log.info(`${label} · found ${resultCount} flights${delta} · ${status ?? "?"} · ${formatDuration(elapsedMs)}`);
+        log.info(`${label} · found ${resultCount} flights${delta} · ${status ?? "unknown"}`);
       },
     );
     if (outcome.httpStatus !== 200 || outcome.failure) {
