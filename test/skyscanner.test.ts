@@ -28,6 +28,27 @@ describe("buildSearchBody", () => {
 });
 
 describe("pageSearch", () => {
+  test("deadline aborts a stalled poll and keeps earlier results", async () => {
+    const realFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = ((_url: string, init: RequestInit) => {
+      if (calls++ === 0) {
+        return Promise.resolve(
+          Response.json({ context: { status: "incomplete", sessionId: "s" }, itineraries: { results: [{ id: "a" }] } }),
+        );
+      }
+      return new Promise((_, reject) => init.signal!.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError"))));
+    }) as typeof fetch;
+    try {
+      const started = performance.now();
+      const result = await pageSearch({ endpoint: "/e/", headers: {}, body: {}, want: 10, fast: false, deadlineMs: 100, pollIntervalMs: 1 });
+      expect(performance.now() - started).toBeLessThan(1_000);
+      expect(result).toMatchObject({ timedOut: true, complete: false, resultCount: 1, httpStatus: 200 });
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
   test("polls until complete and merges results across polls", async () => {
     const responses = [
       { context: { status: "incomplete", sessionId: "s/1" }, itineraries: { results: [{ id: "a" }], agents: [{ id: "x" }] } },

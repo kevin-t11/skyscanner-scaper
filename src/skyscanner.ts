@@ -105,6 +105,9 @@ export interface PageSearchResult {
   requests: number;
   elapsedMs: number;
   firstResultsMs: number | null;
+  /** True when `deadlineMs` cut an in-flight request short. */
+  timedOut: boolean;
+  resultCount: number;
   /** JSON text of `{ results, agents }`: one string crosses CDP faster than a large object. */
   payload: string;
 }
@@ -121,12 +124,23 @@ export async function pageSearch(args: PageSearchArgs): Promise<PageSearchResult
   let context: { status?: string; sessionId?: string } = {};
   let requests = 0;
   let firstResultsMs: number | null = null;
+  let timedOut = false;
+  // Hard deadline: aborts a stalled request instead of only gating the next poll.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), args.deadlineMs);
 
   const call = async (url: string, init: RequestInit): Promise<number> => {
     requests++;
-    const response = await fetch(url, { ...init, credentials: "include", headers: args.headers });
-    if (response.status !== 200) return response.status;
-    const data = await response.json();
+    let data;
+    try {
+      const response = await fetch(url, { ...init, credentials: "include", headers: args.headers, signal: controller.signal });
+      if (response.status !== 200) return response.status;
+      data = await response.json();
+    } catch (error) {
+      if (!controller.signal.aborted) throw error;
+      timedOut = true;
+      return 200;
+    }
     context = data.context ?? {};
     for (const item of data.itineraries?.results ?? []) results.set(item.id, item);
     for (const agent of data.itineraries?.agents ?? []) agents.set(agent.id, agent);
@@ -135,19 +149,22 @@ export async function pageSearch(args: PageSearchArgs): Promise<PageSearchResult
   };
 
   let httpStatus = await call(args.endpoint, { method: "POST", body: JSON.stringify(args.body) });
-  while (httpStatus === 200 && context.status !== "complete" && context.sessionId) {
+  while (httpStatus === 200 && !timedOut && context.status !== "complete" && context.sessionId) {
     if (args.fast && results.size >= args.want) break;
     if (performance.now() - started + args.pollIntervalMs > args.deadlineMs) break;
     await new Promise((resolve) => setTimeout(resolve, args.pollIntervalMs));
     httpStatus = await call(args.endpoint + encodeURIComponent(context.sessionId), { method: "GET" });
   }
 
+  clearTimeout(timer);
   return {
     httpStatus,
-    complete: context.status === "complete",
+    complete: !timedOut && context.status === "complete",
     requests,
     elapsedMs: Math.round(performance.now() - started),
     firstResultsMs,
+    timedOut,
+    resultCount: results.size,
     payload: JSON.stringify({ results: [...results.values()], agents: [...agents.values()] }),
   };
 }

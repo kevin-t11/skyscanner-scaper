@@ -1,4 +1,5 @@
 /** `/url` use case: search URL → entity ids → in-page API search → sorted itineraries. */
+import { CdpError } from "./cdp";
 import type { Config } from "./config";
 import { parseResults, type Itinerary, type SortOrder } from "./parse";
 import { NoSessionAvailable, type Session, type SessionPool } from "./pool";
@@ -82,9 +83,11 @@ export class SearchService implements FlightSearch {
           };
         });
       } catch (error) {
-        if (!(error instanceof SessionBlocked)) throw error;
-        this.pool.retire(session, error.message);
-        if (attempt >= MAX_ATTEMPTS) throw error;
+        // A block, or the browser going away under us (crash, or retired by a parallel search), is retryable.
+        const retryable = error instanceof SessionBlocked || (error instanceof CdpError && !session.usable);
+        if (!retryable) throw error;
+        this.pool.retire(session, (error as Error).message);
+        if (attempt >= MAX_ATTEMPTS) throw error instanceof SessionBlocked ? error : new SessionBlocked(error.message);
       }
     }
   }
@@ -123,10 +126,12 @@ export class SearchService implements FlightSearch {
     session.requests += result.requests;
     // A block after results arrived still returns what we have; a block before that needs a new session.
     if (result.httpStatus === 403) {
-      if (result.payload.length < 30) throw new SessionBlocked("search API returned 403");
+      if (result.resultCount === 0) throw new SessionBlocked("search API returned 403");
       this.pool.retire(session, "search API returned 403 mid-search");
     } else if (result.httpStatus !== 200) {
       throw new UpstreamError(`search API returned HTTP ${result.httpStatus}`);
+    } else if (result.timedOut && result.resultCount === 0) {
+      throw new UpstreamError(`search returned no results within ${searchDeadlineMs} ms`);
     }
     return result;
   }
