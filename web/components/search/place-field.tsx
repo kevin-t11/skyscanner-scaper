@@ -25,6 +25,7 @@ export function PlaceField({ label, direction, value, onChange }: PlaceFieldProp
   const [places, setPlaces] = useState<Place[]>(value ? [value] : []);
   const [loading, setLoading] = useState(false);
   const cache = useRef(new Map<string, Place[]>());
+  const open = useRef(false);
 
   // A value set from outside (swap, popular route) shows its name; clearing it keeps what the user typed.
   const [shownCode, setShownCode] = useState(value?.code);
@@ -76,9 +77,12 @@ export function PlaceField({ label, direction, value, onChange }: PlaceFieldProp
           if (place) setQuery(place.name);
         }}
         query={query}
+        onOpenChange={(next) => {
+          open.current = next;
+        }}
         onQueryChange={(next) => {
-          // Closing the list resets the query to "": keep the picked place and show its name again.
-          if (value && !next) return setQuery(value.name);
+          // Closing the list resets the query to "" (after onOpenChange): keep the picked place and its name.
+          if (value && !next && !open.current) return setQuery(value.name);
           setQuery(next);
           if (value && next !== value.name) onChange(null);
         }}
