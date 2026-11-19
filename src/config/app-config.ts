@@ -34,7 +34,7 @@ const positiveInt = (value: string | undefined, fallback: number): number => {
 
 export function loadAppConfig(env: Env = process.env): AppConfig {
   return {
-    port: positiveInt(env.PORT, 8080),
+    port: positiveInt(env.PORT, 8000),
     hostname: env.HOST || "127.0.0.1",
     apiKey: env.API_KEY || undefined,
     poolSize: positiveInt(env.POOL_SIZE, 2),

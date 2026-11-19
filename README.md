@@ -3,7 +3,7 @@
 An HTTP service that takes a Skyscanner flight search URL and returns its itineraries as sorted JSON.
 
 ```bash
-curl -G localhost:8080/url \
+curl -G localhost:8000/url \
   --data-urlencode 'url=https://www.skyscanner.co.in/transport/flights/blr/del/261223/?adultsv2=1&cabinclass=economy' \
   -d max=10 -d sort=cheapest
 ```
@@ -62,7 +62,7 @@ A Chrome window opens: that is the browser session, so leave it open. When the l
 `first browser session ready, accepting searches`, run a search:
 
 ```bash
-curl -s -G localhost:8080/url \
+curl -s -G localhost:8000/url \
   --data-urlencode 'url=https://www.skyscanner.co.in/transport/flights/bom/goi/261219/?adultsv2=1&cabinclass=economy' \
   -d max=10 -d sort=cheapest | jq '.status, .result.count, .result.itineraries[0].priceFormatted'
 ```
@@ -90,7 +90,7 @@ Set these in `.env` (Bun loads it automatically) or in the environment.
 | `SEARCH_DEADLINE_MS` | `12000` | Maximum time to wait for Skyscanner to finish; partial results are returned after that |
 | `CHROME_PATH` | `google-chrome` | Chrome binary |
 | `HEADLESS` | `false` | Headless Chrome is blocked by the search API; use only for debugging |
-| `PORT` | `8080` | HTTP port |
+| `PORT` | `8000` | HTTP port |
 | `HOST` | `127.0.0.1` | Listen address; use `0.0.0.0` only together with `API_KEY` |
 | `API_KEY` | none | When set, `/url` requires the `x-api-key` header |
 | `OUTPUT_DIR` | `output` | Where every search response is saved as JSON; set it empty (`OUTPUT_DIR=`) to turn saving off |
@@ -111,12 +111,12 @@ Options read from the search URL: `adultsv2`, `childrenv2` (child ages, e.g. `4|
 
 ```bash
 # GET
-curl -G localhost:8080/url --data-urlencode 'url=<search url>' -d max=20 -d sort=fastest -d fast=true
+curl -G localhost:8000/url --data-urlencode 'url=<search url>' -d max=20 -d sort=fastest -d fast=true
 # POST
-curl localhost:8080/url -H 'content-type: application/json' \
+curl localhost:8000/url -H 'content-type: application/json' \
   -d '{"url":"<search url>","max":20,"sort":"best"}'
 # with API_KEY set
-curl -G localhost:8080/url -H 'x-api-key: <key>' --data-urlencode 'url=<search url>'
+curl -G localhost:8000/url -H 'x-api-key: <key>' --data-urlencode 'url=<search url>'
 ```
 
 Every response, pass or fail, has the same shape. Each one carries an `x-request-id` header that matches its log
@@ -178,7 +178,7 @@ time         level  [scope   elapsed]  message
 Search lines are tagged with the request id and the time since the request arrived. From a live run:
 
 ```
-17:25:54.791 INFO  [server] listening on http://127.0.0.1:8899 · www.skyscanner.co.in (IN/INR) · pool 1 · output output
+17:25:54.791 INFO  [server] listening on http://127.0.0.1:8000 · www.skyscanner.co.in (IN/INR) · pool 1 · output output
 17:25:54.795 INFO  [pool] session 58dad6aa0d23 launching without proxy
 17:26:01.432 INFO  [pool] session 58dad6aa0d23 ready in 6.64s (1/1 ready)
 17:26:06.775 INFO  [req 892d46 +0.00s] GET /url sort=cheapest max=10 url=https://www.skyscanner.co.in/transport/flights/blr/del/261223/?adultsv2=1&cabinclass=economy
