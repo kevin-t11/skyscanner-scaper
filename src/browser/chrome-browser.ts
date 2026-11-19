@@ -86,11 +86,6 @@ export class ChromeBrowser {
     return result.value as T;
   }
 
-  /** Sets a cookie for every path on `domain` (a leading dot includes subdomains). */
-  async setCookie(name: string, value: string, domain: string): Promise<void> {
-    await this.sendToPage("Network.setCookie", { name, value, domain, path: "/", secure: true });
-  }
-
   async close(): Promise<void> {
     this.cdp.close();
     this.process.kill();

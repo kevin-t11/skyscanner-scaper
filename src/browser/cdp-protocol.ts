@@ -31,10 +31,6 @@ export interface CdpCommands {
   "Target.getTargets": { params: Record<string, never>; result: { targetInfos: TargetInfo[] } };
   "Target.createTarget": { params: { url: string }; result: { targetId: string } };
   "Target.attachToTarget": { params: { targetId: string; flatten: true }; result: { sessionId: string } };
-  "Network.setCookie": {
-    params: { name: string; value: string; domain: string; path: string; secure: boolean };
-    result: { success: boolean };
-  };
   "Page.navigate": { params: { url: string }; result: { frameId: string; errorText?: string } };
   "Runtime.evaluate": {
     params: { expression: string; awaitPromise: boolean; returnByValue: boolean };

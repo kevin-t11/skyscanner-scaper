@@ -119,15 +119,11 @@ export class SessionPool {
       });
       this.warmingBrowsers.add(browser);
       if (this.stopped) throw new Error("pool stopped");
-      // Skyscanner prices in the culture cookie's currency, which it otherwise picks from the proxy IP's country.
-      await browser.setCookie(
-        "ssculture",
-        `locale:::${config.locale}&market:::${config.market}&currency:::${config.currency}`,
-        `.${config.skyscannerHost.replace(/^www\./, "")}`,
-      );
       // Landing on the home page lets PerimeterX's sensor run and set its cookies.
       // A captcha page is still a usable origin: the sensor runs there too.
-      await browser.navigate(`${this.origin}/`);
+      const landedOn = new URL(await browser.navigate(`${this.origin}/`)).host;
+      // Some proxy IPs are redirected to another market (e.g. www.skyscanner.com, priced in USD).
+      if (landedOn !== config.skyscannerHost) throw new Error(`redirected to ${landedOn}`);
       this.warmingBrowsers.delete(browser);
       if (this.stopped) throw new Error("pool stopped");
 
