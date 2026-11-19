@@ -42,6 +42,7 @@ export class SessionPool {
   private consecutiveLaunchFailures = 0;
   private readonly counters = { launched: 0, retired: 0, launchErrors: 0 };
   private lastError: string | null = null;
+  private lastSuccessAt: number | null = null;
 
   constructor(private readonly config: AppConfig) {}
 
@@ -93,6 +94,11 @@ export class SessionPool {
     return succeeded;
   }
 
+  /** Records a search that passed; kept on the pool so it survives session replacement. */
+  recordSuccess(): void {
+    this.lastSuccessAt = Date.now();
+  }
+
   /** Retires a session and launches a replacement with a new proxy IP. */
   retire(session: BrowserSession, reason: string): void {
     if (!this.sessions.delete(session)) return;
@@ -107,7 +113,6 @@ export class SessionPool {
     const sessions = [...this.sessions];
     const warming = this.warmingBrowsers.size;
     const oldestStartedAt = Math.min(...sessions.map((session) => session.startedAt));
-    const lastSuccessAt = Math.max(0, ...sessions.map((session) => session.lastSuccessAt ?? 0));
     return {
       status: sessions.length ? "ok" : warming ? "warming" : "no-browsers",
       size: this.config.poolSize,
@@ -118,7 +123,7 @@ export class SessionPool {
       launch_errors: this.counters.launchErrors,
       last_error: this.lastError,
       oldest_session_age_s: sessions.length ? Math.round((Date.now() - oldestStartedAt) / 100) / 10 : null,
-      last_success_at: lastSuccessAt ? new Date(lastSuccessAt).toISOString() : null,
+      last_success_at: this.lastSuccessAt ? new Date(this.lastSuccessAt).toISOString() : null,
       proxy: Boolean(this.config.proxyUrl),
     };
   }

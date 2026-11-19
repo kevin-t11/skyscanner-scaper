@@ -18,6 +18,18 @@ describe("proxy settings", () => {
     });
   });
 
+  test("parses host:port:user:pass with a scheme", () => {
+    expect(parseProxyUrl("http://proxy.example.com:1000:user:pass")).toEqual({
+      server: "http://proxy.example.com:1000",
+      username: "user",
+      password: "pass",
+    });
+  });
+
+  test("explains an unparseable PROXY_URL", () => {
+    expect(() => parseProxyUrl("proxy.example.com:1000:user")).toThrow("PROXY_URL must be");
+  });
+
   test("fills {session} in either form", () => {
     expect(proxyForSession("proxy.example.com:1000:user:pass_session-{session}", "s1")?.password).toBe("pass_session-s1");
     expect(proxyForSession("http://user:pass_session-{session}@proxy.example.com:1000", "s2")?.password).toBe("pass_session-s2");

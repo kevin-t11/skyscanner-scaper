@@ -6,16 +6,19 @@ export interface ProxySettings {
 }
 
 /**
- * `http://user:pass@host:port`, or the `host:port:user:pass` form proxy dashboards export,
+ * `http://user:pass@host:port`, or the `host:port:user:pass` form proxy dashboards export
+ * (optionally with a scheme, e.g. `http://host:port:user:pass`),
  * → `{ server: "http://host:port", username, password }`.
  */
 export function parseProxyUrl(proxyUrl: string): ProxySettings {
-  const parts = proxyUrl.split(":");
-  if (!proxyUrl.includes("://") && parts.length === 4) {
+  const [, scheme = "http", rest = proxyUrl] = /^([a-z0-9]+):\/\/(.*)$/i.exec(proxyUrl) ?? [];
+  const parts = rest.split(":");
+  if (!rest.includes("@") && parts.length === 4) {
     const [host, port, username, password] = parts;
-    return { server: `http://${host}:${port}`, username, password };
+    return { server: `${scheme}://${host}:${port}`, username, password };
   }
-  const url = new URL(proxyUrl);
+  const url = URL.canParse(proxyUrl) ? new URL(proxyUrl) : undefined;
+  if (!url?.hostname) throw new Error('PROXY_URL must be "http://user:pass@host:port" or "host:port:user:pass"');
   return {
     server: `${url.protocol}//${url.hostname}:${url.port}`,
     username: url.username ? decodeURIComponent(url.username) : undefined,
