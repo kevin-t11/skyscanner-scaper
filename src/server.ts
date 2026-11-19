@@ -1,7 +1,7 @@
 /** HTTP bootstrap only: starts Bun's server with the routes from `routes/`. */
 import type { FlightSearch } from "./search/flight-search-service";
 import { createRoutes } from "./routes";
-import type { UrlRouteOptions } from "./routes/url/url.route";
+import type { UrlRouteOptions } from "./routes/url.route";
 
 export interface HttpServerOptions extends UrlRouteOptions {
   port: number;

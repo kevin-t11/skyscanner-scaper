@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
-import { failEnvelope } from "../../src/routes/url/url-response";
+import { failEnvelope } from "../../src/routes/url.route";
 import { saveSearchOutput } from "../../src/output/search-output-writer";
 
 test("saves the envelope as pretty JSON with a descriptive file name", async () => {

@@ -251,13 +251,10 @@ src/
 ├── config/app-config.ts             AppConfig, loadAppConfig (env)
 ├── logging/logger.ts                createLogger: compact, timed, leveled log lines
 ├── output/search-output-writer.ts   saveSearchOutput: one JSON file per search
-├── routes/                          every endpoint lives here, one file or folder per route
+├── routes/                          every endpoint lives here, one file per route
 │   ├── index.ts                     createRoutes: the route table (add /details here later)
 │   ├── health.route.ts              GET /health
-│   └── url/
-│       ├── url.route.ts             GET|POST /url: API key, request id, logging, saving, error → envelope
-│       ├── url-request.ts           parseSearchRequest: validates url / max / sort / fast
-│       └── url-response.ts          SearchEnvelope, passEnvelope, failEnvelope
+│   └── url.route.ts                 GET|POST /url: input validation, response envelope, handler (logging, saving)
 ├── search/flight-search-service.ts  FlightSearchService: the /url use case, route cache, retry on a fresh session
 ├── sessions/
 │   ├── session-pool.ts              SessionPool: warm-up, least-busy acquire, retire + replace, shutdown
@@ -315,9 +312,7 @@ What each folder and file is for, in the order a `/url` request passes through t
 |---|---|
 | `index.ts` | The route table: lists every endpoint and connects it to its handler. Add new endpoints here |
 | `health.route.ts` | `GET /health`: returns the browser pool's state |
-| `url/url.route.ts` | `GET` and `POST /url`. For each request it: checks `x-api-key`, assigns a request id and logger, validates the input, runs the search, builds the response, logs the result and saves the JSON file |
-| `url/url-request.ts` | `parseSearchRequest`: checks `url`, `max`, `sort` and `fast` and applies defaults (`max=50`, `sort=best`) |
-| `url/url-response.ts` | The response format: `SearchEnvelope`, `passEnvelope`, `failEnvelope` (`status`, `timeElapsedMs`, `request`, `result`, `failed`) |
+| `url.route.ts` | Everything for `GET` and `POST /url`, in three sections: <br>• **request**: `parseSearchRequest` checks `url`, `max`, `sort` and `fast` and applies defaults (`max=50`, `sort=best`) <br>• **response**: `SearchEnvelope`, `passEnvelope`, `failEnvelope` (`status`, `timeElapsedMs`, `request`, `result`, `failed`) <br>• **handler**: `createUrlRoute` checks `x-api-key`, assigns a request id, runs the search, logs the result and saves the JSON file |
 
 ### `src/search/` (the search itself)
 | File | What it does |

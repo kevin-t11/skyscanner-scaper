@@ -1,7 +1,7 @@
 /** Saves each `/url` response as a JSON file, e.g. `output/20261219-172105_blr-maa_cheapest_pass_3f9a1c.json`. */
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { SearchEnvelope } from "../routes/url/url-response";
+import type { SearchEnvelope } from "../routes/url.route";
 
 const fileTimestamp = (date: Date) => {
   const pad = (value: number) => String(value).padStart(2, "0");
