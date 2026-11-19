@@ -244,6 +244,7 @@ export class FlightSearchService implements FlightSearch {
     if (lookup.failure === "network") throw new SessionNetworkError("route lookup failed: network error");
     if (isChallengeUrl(lookup.finalUrl)) throw new SessionBlockedError("search page challenged", lookup.finalUrl);
     if (lookup.status === 403) throw new SessionBlockedError("search page returned 403");
+    if (lookup.status === 404) throw new PlaceNotFoundError(`unknown place code "${query.from}" or "${query.to}"`);
     if (lookup.status !== 200) throw new UpstreamError(`search page returned HTTP ${lookup.status}`);
     if (!lookup.originEntityId || !lookup.destinationEntityId) {
       throw new PlaceNotFoundError(`could not resolve places "${query.from}" / "${query.to}" (HTTP ${lookup.status})`);
