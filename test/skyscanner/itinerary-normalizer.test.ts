@@ -34,6 +34,13 @@ describe("rankItineraries", () => {
     expect(keys).toEqual([...keys].sort((a, b) => a - b));
   });
 
+  test("tolerates legs without origin or destination", () => {
+    const raw = structuredClone(payload.results[0]!);
+    delete (raw.legs[0] as { origin?: unknown }).origin;
+    const [itinerary] = rankItineraries({ results: [raw], agents: [] }, "best", 1, SITE_ORIGIN).itineraries;
+    expect(itinerary!.legs[0]!.origin).toEqual({ code: "", name: "", city: undefined, entityId: "" });
+  });
+
   test("keeps at most maxItems", () => {
     expect(rankItineraries(payload, "best", 2, SITE_ORIGIN).itineraries).toHaveLength(2);
   });

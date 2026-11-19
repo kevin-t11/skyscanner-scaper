@@ -5,11 +5,12 @@ import type { BookingOption, FlightLeg, Itinerary, Place, SortOrder } from "./it
 
 const MAX_BOOKING_OPTIONS = 5;
 
-const toPlace = (place: ApiPlace): Place => ({
-  code: place.displayCode ?? place.id,
-  name: place.name,
-  city: place.city,
-  entityId: String(place.entityId),
+/** Skyscanner occasionally omits place fields; missing values become empty strings. */
+const toPlace = (place: Partial<ApiPlace> | undefined): Place => ({
+  code: place?.displayCode ?? place?.id ?? "",
+  name: place?.name ?? "",
+  city: place?.city,
+  entityId: place?.entityId ? String(place.entityId) : "",
 });
 
 const toLeg = (leg: ApiLeg): FlightLeg => ({
