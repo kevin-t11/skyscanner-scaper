@@ -69,11 +69,11 @@ To run it as a service, put `xvfb-run -a bun src/main.ts` in a systemd unit or a
 Stop it with Ctrl-C or `SIGTERM`; browsers are closed cleanly.
 
 ## Configuration
-Only these come from `.env` (Bun loads it automatically) or the environment:
+Only these, and only from the `.env` file in the project folder (shell or systemd variables are ignored):
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `PROXY_URL` | none | `http://user:pass@host:port`; `{session}` is replaced per browser so each one keeps a sticky IP |
+| `PROXY_URL` | none | `http://user:pass@host:port` or `host:port:user:pass`; `{session}` is replaced per browser so each one keeps a sticky IP |
 | `PORT` | `8000` | HTTP port; the server listens on `localhost` only |
 | `POOL_SIZE` | `1` | Browser sessions (one IP and ~300–700 MB RAM each); raise it for parallel searches |
 | `API_KEY` | none | When set, `/url` requires the `x-api-key` header |
@@ -221,12 +221,15 @@ headful browser), Bun, a 2 GB swap file on small instances, the code, `.env`, a 
 and a daily cleanup of `output/` files older than 7 days. Re-running it updates the code and restarts the service.
 
 1. Create an Ubuntu 22.04/24.04 instance: at least 2 GB RAM for `POOL_SIZE=1`, plus about 700 MB per extra browser.
-2. SSH in and run:
+2. SSH in and run the script twice: the first run creates `.env` (with a generated `API_KEY`) and stops so you
+   can set `PROXY_URL` and `POOL_SIZE` in it; the second run installs and starts everything.
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/kevin-t11/skyscanner-scaper/main/deploy/setup-lightsail.sh -o setup.sh
-   PROXY_URL='host:port:user:pass_session-{session}' POOL_SIZE=1 bash setup.sh
+   git clone https://github.com/kevin-t11/skyscanner-scaper.git ~/skyscanner-scaper && cd ~/skyscanner-scaper
+   bash deploy/setup-lightsail.sh
+   nano .env
+   DOMAIN=:80 bash deploy/setup-lightsail.sh
    ```
-   Optional: `API_KEY=...` (generated and printed when omitted), `BRANCH=...`, and `DOMAIN` to add Caddy in front:
+   Script options (not scraper settings): `BRANCH=...`, and `DOMAIN` to add Caddy in front:
    `DOMAIN=:80` serves the API on the server's IP over HTTP (open port 80 in the Lightsail firewall);
    `DOMAIN=api.example.com` adds automatic HTTPS (open ports 80 and 443).
 3. Check it: `curl localhost:8000/health`, logs with `journalctl -u skyscanner -f`.
@@ -304,7 +307,7 @@ What each folder and file is for, in the order a `/url` request passes through t
 | `package.json` | Scripts (`start`, `dev`, `test`, `typecheck`) and dev dependencies |
 | `bun.lock` | Locked dependency versions |
 | `tsconfig.json` | TypeScript settings (strict mode) |
-| `.env.example` | Every environment variable with a comment; copy it to `.env` |
+| `.env.example` | Every setting with a comment; copy it to `.env` (the only place settings are read from) |
 | `DEPLOYMENT.md` | Lightsail release procedure: first-time setup, upload, staged test, backup, restart, verify, rollback |
 | `deploy/setup-lightsail.sh` | One-shot Ubuntu/Lightsail setup: Chrome, Xvfb, Bun, swap, code, `.env`, systemd service, output cleanup, optional Caddy HTTPS |
 | `.gitignore` | Keeps `.env`, `node_modules/`, HAR captures and `/output/` out of git |
@@ -360,7 +363,8 @@ What each folder and file is for, in the order a `/url` request passes through t
 ### `src/config/`, `src/logging/`, `src/output/`
 | File | What it does |
 |---|---|
-| `config/app-config.ts` | `loadAppConfig`: reads the few environment variables and holds the fixed settings (site, deadline, output folder, Chrome lookup) |
+| `config/app-config.ts` | `loadAppConfig`: reads the few settings from `.env` and holds the fixed settings (site, deadline, output folder, Chrome lookup) |
+| `config/dotenv.ts` | `readDotEnv`: parses `.env` (comments, inline comments, quotes); the only settings source |
 | `logging/logger.ts` | `createLogger`: compact log lines (`time LEVEL [scope +elapsed] message`), the `LOGGING` switch, and escaping so input can't forge log lines |
 | `output/search-output-writer.ts` | `saveSearchOutput`: writes each response to `output/` as `{time}_{from}-{to}_{sort}_{pass\|fail}_{id}.json` |
 

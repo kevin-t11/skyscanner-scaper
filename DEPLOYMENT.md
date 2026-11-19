@@ -26,16 +26,19 @@ Credentials live only in the VM's `.env` (`PROXY_URL`, `API_KEY`); it is never u
    chmod 600 ~/.ssh/<lightsail-key>.pem
    ssh -i ~/.ssh/<lightsail-key>.pem ubuntu@<LIGHTSAIL_IP>
    ```
-3. On the VM, run the setup script. It installs Chrome, Xvfb, Bun, swap, the code, `.env`,
-   the `skyscanner` service, a daily `output/` cleanup, and Caddy on port 80:
+3. On the VM, run the setup script twice. The first run installs Chrome, Xvfb, Bun and swap, creates `.env`
+   from `.env.example` with a generated `API_KEY`, and stops. Edit `.env`, then the second run installs
+   the `skyscanner` service, a daily `output/` cleanup and Caddy on port 80:
    ```bash
    git clone https://github.com/kevin-t11/skyscanner-scaper.git ~/skyscanner-scaper
    cd ~/skyscanner-scaper
-   DOMAIN=:80 POOL_SIZE=1 \
-   PROXY_URL='core-residential.evomi.com:1000:USER:PASS_country-IN_session-{session}_lifetime-30' \
    bash deploy/setup-lightsail.sh
+   nano .env      # PROXY_URL=core-residential.evomi.com:1000:USER:PASS_country-IN_session-{session}_lifetime-30
+                  # POOL_SIZE=1
+   DOMAIN=:80 bash deploy/setup-lightsail.sh
    ```
-   Save the printed `API_KEY` (also in `~/skyscanner-scaper/.env`). With a real domain, use
+   Settings are read only from `.env`; after editing it later, run `sudo systemctl restart skyscanner`.
+   Keep the `API_KEY` from `.env` for callers. With a real domain, use
    `DOMAIN=api.example.com` instead and also open port 443: Caddy then issues HTTPS certificates.
 4. From your Mac: `curl http://<LIGHTSAIL_IP>/health`
 

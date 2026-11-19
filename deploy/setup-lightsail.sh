@@ -3,10 +3,10 @@
 # clones the scraper, writes .env and runs it as a systemd service on localhost (PORT, default 8000).
 # Safe to re-run: it updates the code and restarts the service.
 #
-#   curl -fsSL https://raw.githubusercontent.com/kevin-t11/skyscanner-scaper/main/deploy/setup-lightsail.sh -o setup.sh
-#   PROXY_URL='host:port:user:pass_session-{session}' API_KEY=secret bash setup.sh
+#   bash deploy/setup-lightsail.sh            # 1st run creates .env and stops: edit it (PROXY_URL, POOL_SIZE)
+#   bash deploy/setup-lightsail.sh            # 2nd run installs and starts the service
 #
-# Optional env: POOL_SIZE (default 1), BRANCH (default main),
+# Scraper settings come only from .env. Script options: BRANCH (default main),
 #   DOMAIN: adds Caddy in front; a domain gets HTTPS, DOMAIN=:80 serves plain HTTP on the server's IP.
 set -euo pipefail
 
@@ -54,23 +54,18 @@ fi
 as_app "cd '$APP_DIR' && '$BUN' install --frozen-lockfile >/dev/null"
 
 step ".env"
+# All settings live in .env; nothing is taken from this shell's environment.
 if [ ! -f "$APP_DIR/.env" ]; then
-  if [ -z "${PROXY_URL:-}" ] && [ -t 0 ]; then
-    read -rp "PROXY_URL (empty = no proxy, use {session} for sticky IPs): " PROXY_URL
-  fi
-  if [ -z "${API_KEY:-}" ]; then API_KEY="$(openssl rand -hex 16)"; echo "generated API_KEY: $API_KEY"; fi
-  as_app "cat > '$APP_DIR/.env'" <<ENV
-PROXY_URL=${PROXY_URL:-}
-PORT=8000
-POOL_SIZE=${POOL_SIZE:-1}
-API_KEY=$API_KEY
-LOGGING=enabled
-CHROME_PATH=$(readlink -f "$(command -v google-chrome)")
-ENV
+  as_app "cp '$APP_DIR/.env.example' '$APP_DIR/.env'"
+  sed -i -E "s/^API_KEY=[^#]*/API_KEY=$(openssl rand -hex 16)   /" "$APP_DIR/.env"
+  echo "CHROME_PATH=$(readlink -f "$(command -v google-chrome)")" >> "$APP_DIR/.env"
   chmod 600 "$APP_DIR/.env"
-else
-  echo "keeping existing $APP_DIR/.env"
+  echo "created $APP_DIR/.env (API_KEY generated). Set PROXY_URL and POOL_SIZE in it, then run this script again:"
+  echo "  nano $APP_DIR/.env"
+  exit 0
 fi
+echo "using $APP_DIR/.env"
+grep -qE '^PROXY_URL=[^[:space:]#]' "$APP_DIR/.env" || echo "warning: PROXY_URL is empty in .env; searches use the server's own IP"
 APP_PORT="$(sed -nE 's/^PORT=([0-9]+).*/\1/p' "$APP_DIR/.env" | tail -1)"
 APP_PORT="${APP_PORT:-8000}"
 APP_POOL="$(sed -nE 's/^POOL_SIZE=([0-9]+).*/\1/p' "$APP_DIR/.env" | tail -1)"
