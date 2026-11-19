@@ -149,10 +149,9 @@ lines and output file.
     "sorting": "cheapest"
   },
   "result": {                        // null on fail
-    "complete": true,                // false when the 12 s deadline was reached first
+    "complete": true,                // false when stopped early (stable results or the 12 s deadline)
     "counts": {                      // how many itineraries...
-      "received": 270,               // ...Skyscanner returned
-      "passed": 270,                 // ...were parsed successfully, with a price
+      "total": 270,                  // ...were found and usable
       "failed": 0,                   // ...were dropped (no price or malformed data)
       "returned": 10                 // ...are in this response (<= maxItems)
     },

@@ -24,6 +24,6 @@ curl -s "$BASE/url" -H "x-api-key: $KEY" -H 'content-type: application/json' \
     const r = await Bun.stdin.json();
     const top = r.result?.itineraries?.[0];
     console.log(r.status === "pass"
-      ? `pass · ${r.result.counts.passed} flights · cheapest ${top?.priceFormatted ?? "-"} · ${r.timeElapsedMs} ms`
+      ? `pass · ${r.result.counts.total} flights · cheapest ${top?.priceFormatted ?? "-"} · ${r.timeElapsedMs} ms`
       : `fail · ${r.failed?.code}: ${r.failed?.message}`);
     process.exit(r.status === "pass" ? 0 : 1);'

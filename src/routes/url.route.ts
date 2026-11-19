@@ -15,7 +15,6 @@ import { createLogger, formatDuration, type Logger } from "../utils/logger";
 import { saveSearchOutput } from "../utils/output-writer";
 import type { FlightSearchRequest, FlightSearchResult, RoutePlaces, SearchTimings } from "../services/flight-search.service";
 import { SORT_ORDERS, type Itinerary, type SortOrder } from "../types/itinerary";
-import type { ItineraryCounts } from "../parsers/itinerary-normalizer";
 import { parseSearchUrl, type FlightSearchQuery } from "../parsers/search-url";
 import type { RouteContext } from "./route-context";
 
@@ -92,8 +91,8 @@ export interface SearchRequestSummary {
 export interface SearchResultSummary {
   /** False when the deadline was reached before Skyscanner finished. */
   complete: boolean;
-  /** received = from Skyscanner, passed = parsed and priced, failed = dropped, returned = in this response (`<= maxItems`). */
-  counts: ItineraryCounts & { returned: number };
+  /** total = usable flights found, failed = broken ones dropped, returned = in this response (`<= maxItems`). */
+  counts: { total: number; failed: number; returned: number };
   query: FlightSearchQuery;
   /** What `from` / `to` resolved to. */
   places: RoutePlaces;
@@ -120,7 +119,7 @@ export function passEnvelope(request: SearchRequestSummary, result: FlightSearch
     request,
     result: {
       complete: result.complete,
-      counts: { ...result.counts, returned: result.itineraries.length },
+      counts: { total: result.counts.passed, failed: result.counts.failed, returned: result.itineraries.length },
       query: result.query,
       places: result.places,
       searchUrl: result.searchUrl,
@@ -188,7 +187,7 @@ function logOutcome(log: Logger, envelope: SearchEnvelope): void {
     const { counts, complete, itineraries } = envelope.result;
     const top = itineraries[0];
     const topLabel = top ? ` · top ${top.priceFormatted || top.price}, ${top.durationMinutes} min` : "";
-    log.info(`pass · ${counts.returned}/${counts.passed} flights (${counts.failed} failed)${complete ? "" : " (partial)"}${topLabel} · ${formatDuration(envelope.timeElapsedMs)}`);
+    log.info(`pass · ${counts.returned}/${counts.total} flights (${counts.failed} failed)${complete ? "" : " (partial)"}${topLabel} · ${formatDuration(envelope.timeElapsedMs)}`);
   } else {
     const failure = envelope.failed as { code?: string; message?: string };
     log.warn(`fail · ${failure.code}: ${failure.message} · ${formatDuration(envelope.timeElapsedMs)}`);
