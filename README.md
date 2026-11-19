@@ -95,14 +95,13 @@ Send a JSON body. `GET /url` returns 405.
 | `url` | required | Skyscanner flight search URL (`/transport/flights/{from}/{to}/{yymmdd}/[{yymmdd}/]`) |
 | `max` | `50` | Itineraries to return (1–1000) |
 | `sort` | `best` | `best` (Skyscanner's score), `cheapest`, or `fastest` |
-| `fast` | `false` | Return as soon as `max` itineraries are known instead of waiting for the complete list |
 
 Options read from the search URL: `adultsv2`, `childrenv2` (child ages, e.g. `4|9`), `cabinclass`
 (`economy`, `premiumeconomy`, `business`, `first`). Add a second date for a return trip.
 
 ```bash
 curl localhost:8000/url -H 'content-type: application/json' \
-  -d '{"url":"<search url>","max":20,"sort":"fastest","fast":true}'
+  -d '{"url":"<search url>","max":20,"sort":"fastest"}'
 # with API_KEY set
 curl localhost:8000/url -H 'content-type: application/json' -H 'x-api-key: <key>' -d '{"url":"<search url>"}'
 ```
@@ -118,11 +117,10 @@ lines and output file.
   "request": {                       // options the search ran with, defaults applied
     "searchUrl": "https://www.skyscanner.co.in/transport/flights/blr/del/261223/?adultsv2=1&cabinclass=economy",
     "maxItems": 10,
-    "sorting": "cheapest",
-    "fast": false
+    "sorting": "cheapest"
   },
   "result": {                        // null on fail
-    "complete": true,                // false when stopped by `fast` or the deadline
+    "complete": true,                // false when the 12 s deadline was reached first
     "total": 270,                    // priced itineraries Skyscanner returned
     "count": 10,                     // itineraries in this response
     "query": { "from": "blr", "to": "del", "dates": ["2026-12-23"], "adults": 1, "childAges": [], "cabinClass": "ECONOMY" },
@@ -185,7 +183,7 @@ Search lines are tagged with the request id and the time since the request arriv
 |---|---|
 | `url fetched · route …` | The search page was fetched once to look up the airports' Skyscanner ids (later searches on the route say `cached`) |
 | `search created` / `poll N` | One API request each; `found` counts distinct flights so far, `(+N)` the new ones, then Skyscanner's status |
-| `complete` / `deadline reached` / `fast mode` | Why the search stopped |
+| `complete` / `deadline reached` | Why the search stopped |
 | `pass` / `fail` | What the response contained |
 | `[pool] session … retired` | A session was blocked or broke and is being replaced with a new IP |
 
@@ -208,7 +206,7 @@ PROXY_URL=http://USERNAME:PASSWORD_country-IN_session-{session}_lifetime-30@rp.e
 - Chrome connects through the proxy and answers its login itself.
 - Images, fonts and media are blocked.
 - Skyscanner's static CDN (`*.skyscnr.com`) bypasses the proxy.
-- A complete search uses about 0.5–4 MB of proxy traffic; `fast=true` uses far less.
+- A search uses about 0.5–4 MB of proxy traffic.
 
 ## Troubleshooting
 | Symptom | Fix |
@@ -217,8 +215,7 @@ PROXY_URL=http://USERNAME:PASSWORD_country-IN_session-{session}_lifetime-30@rp.e
 | `[pool] session … failed to start: … ENOENT` | Chrome wasn't found: set `CHROME_PATH` to your Chrome binary |
 | `blocked` on every search | The IP is flagged: use a residential proxy, and on a server run under `xvfb-run` |
 | `upstream_error: could not resolve places` | The URL's airport or city codes are wrong, or the site has no page for that route |
-| `upstream_error: … no results within 12000 ms` | Skyscanner was slow: retry, or use `fast=true` |
-| Searches slow on large routes | Use `fast=true` and a smaller `max`; first results arrive in about 1–3 s |
+| `upstream_error: … no results within 12000 ms` | Skyscanner was slow: retry |
 | Port already in use | Change `PORT`, or stop the old server (`pkill -f "bun src/main.ts"`) |
 
 ## Project structure
@@ -300,7 +297,7 @@ What each folder and file is for, in the order a `/url` request passes through t
 | `index.ts` | The route table: lists every endpoint and connects it to its handler. Add new endpoints here |
 | `route-context.ts` | `RouteContext`: what handlers can use (search service, pool health, API key, output folder) |
 | `health.route.ts` | `GET /health`: returns the browser pool's state |
-| `url.route.ts` | Everything for `POST /url`, in three sections: <br>• **request**: `parseSearchRequest` checks `url`, `max`, `sort` and `fast` and applies defaults (`max=50`, `sort=best`) <br>• **response**: `SearchEnvelope`, `passEnvelope`, `failEnvelope` (`status`, `timeElapsedMs`, `request`, `result`, `failed`) <br>• **handler**: `createUrlRoute` checks `x-api-key`, assigns a request id, runs the search, logs the result and saves the JSON file |
+| `url.route.ts` | Everything for `POST /url`, in three sections: <br>• **request**: `parseSearchRequest` checks `url`, `max` and `sort` and applies defaults (`max=50`, `sort=best`) <br>• **response**: `SearchEnvelope`, `passEnvelope`, `failEnvelope` (`status`, `timeElapsedMs`, `request`, `result`, `failed`) <br>• **handler**: `createUrlRoute` checks `x-api-key`, assigns a request id, runs the search, logs the result and saves the JSON file |
 
 ### `src/search/` (the search itself)
 | File | What it does |
@@ -326,7 +323,7 @@ What each folder and file is for, in the order a `/url` request passes through t
 |---|---|
 | `search-url.ts` | `parseSearchUrl`: turns `/transport/flights/{from}/{to}/{yymmdd}/…?adultsv2&childrenv2&cabinclass` into a `FlightSearchQuery`; impossible dates are rejected |
 | `unified-search-api.ts` | Skyscanner's search API: the endpoint, `buildUnifiedSearchBody` / `buildUnifiedSearchHeaders`, and typed API responses (`ApiItinerary`, `ApiLeg`, …) |
-| `unified-search-runner.ts` | `runUnifiedSearch`: the create-then-poll loop. It enforces the deadline, stops early with `fast`, reports progress after each request (the `poll N` log lines), and reports blocks, network errors and bad responses |
+| `unified-search-runner.ts` | `runUnifiedSearch`: the create-then-poll loop. It waits for `complete` within the deadline, reports progress after each request (the `poll N` log lines), and reports blocks, network errors and bad responses |
 | `page-scripts.ts` | Functions that run inside the Skyscanner page, so requests use the browser's cookies: <br>• airport-id lookup from the search page <br>• one create or poll request, with results merged by id <br>• collecting the merged results |
 | `itinerary.ts` | The public result types: `Itinerary`, `FlightLeg`, `FlightSegment`, `BookingOption`, `SortOrder` |
 | `itinerary-normalizer.ts` | `normalizeItinerary` turns Skyscanner's raw itineraries into `Itinerary` objects. `rankItineraries` drops unpriced ones, sorts by `best`, `cheapest` or `fastest`, and keeps `max` |
@@ -345,7 +342,7 @@ What each folder and file is for, in the order a `/url` request passes through t
 | `routes/routes.test.ts` | `/url` and `/health` end to end against a fake search: defaults, errors, API key, saved files, 404 |
 | `skyscanner/search-url.test.ts` | URL parsing and rejection of bad URLs and dates |
 | `skyscanner/unified-search-api.test.ts` | That the request body matches what Skyscanner's website sends |
-| `skyscanner/unified-search-runner.test.ts` | The create/poll loop: merging, deadline, `fast`, 403, network drops, invalid JSON |
+| `skyscanner/unified-search-runner.test.ts` | The create/poll loop: merging, deadline, 403, network drops, invalid JSON |
 | `skyscanner/page-scripts.test.ts` | Airport-id lookup, and its timeout and network-failure cases |
 | `skyscanner/itinerary-normalizer.test.ts` | Normalizing, sorting, `max`, missing fields |
 | `logging/logger.test.ts` | Log format, levels, `LOGGING=disabled`, newline escaping |

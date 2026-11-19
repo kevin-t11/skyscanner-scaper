@@ -20,8 +20,6 @@ export interface FlightSearchRequest {
   searchUrl: string;
   maxItems: number;
   sort: SortOrder;
-  /** Return as soon as `maxItems` itineraries are known instead of waiting for `complete`. */
-  fast: boolean;
 }
 
 export interface SearchTimings {
@@ -34,7 +32,7 @@ export interface SearchTimings {
 
 export interface FlightSearchResult {
   query: FlightSearchQuery;
-  /** False when stopped by `fast` or the deadline before Skyscanner finished. */
+  /** False when the deadline was reached before Skyscanner finished. */
   complete: boolean;
   total: number;
   itineraries: Itinerary[];
@@ -98,7 +96,7 @@ export class FlightSearchService implements FlightSearch {
 
     const outcome = await this.runUnifiedSearch(session, parsedUrl.query, route, request, log);
     const { total, itineraries } = rankItineraries(outcome.payloadJson, request.sort, request.maxItems, this.pool.origin);
-    const stoppedBy = outcome.complete ? "complete" : outcome.timedOut ? "deadline reached" : request.fast ? "fast mode" : "partial";
+    const stoppedBy = outcome.complete ? "complete" : outcome.timedOut ? "deadline reached" : "partial";
     log.info(
       `${stoppedBy} · ${total} flights in ${outcome.upstreamRequests} request${outcome.upstreamRequests === 1 ? "" : "s"} · search ${formatDuration(outcome.elapsedMs)}` +
         (outcome.firstResultsMs === null ? "" : `, first results ${formatDuration(outcome.firstResultsMs)}`),
@@ -166,8 +164,6 @@ export class FlightSearchService implements FlightSearch {
         endpoint: UNIFIED_SEARCH_ENDPOINT,
         headers: buildUnifiedSearchHeaders({ market, locale, currency }),
         body: buildUnifiedSearchBody(query, route),
-        enoughResults: request.maxItems,
-        stopWhenEnough: request.fast,
         deadlineMs: searchDeadlineMs,
         pollIntervalMs: POLL_INTERVAL_MS,
       },

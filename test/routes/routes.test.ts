@@ -29,10 +29,10 @@ describe("/url", () => {
   test("POST with defaults returns a pass envelope", async () => {
     const response = await post({ url: SEARCH_URL });
     expect(response.status).toBe(200);
-    expect(received.at(-1)).toEqual({ searchUrl: SEARCH_URL, maxItems: 50, sort: "best", fast: false });
+    expect(received.at(-1)).toEqual({ searchUrl: SEARCH_URL, maxItems: 50, sort: "best" });
     expect(await response.json()).toMatchObject({
       status: "pass",
-      request: { searchUrl: SEARCH_URL, maxItems: 50, sorting: "best", fast: false },
+      request: { searchUrl: SEARCH_URL, maxItems: 50, sorting: "best" },
       result: { complete: true, total: 0, count: 0, itineraries: [] },
       failed: {},
     });
@@ -41,10 +41,10 @@ describe("/url", () => {
   test("POST with options", async () => {
     const response = await fetch(`${baseUrl}/url`, {
       method: "POST",
-      body: JSON.stringify({ url: SEARCH_URL, max: 5, sort: "fastest", fast: true }),
+      body: JSON.stringify({ url: SEARCH_URL, max: 5, sort: "fastest" }),
     });
     expect(response.status).toBe(200);
-    expect(received.at(-1)).toEqual({ searchUrl: SEARCH_URL, maxItems: 5, sort: "fastest", fast: true });
+    expect(received.at(-1)).toEqual({ searchUrl: SEARCH_URL, maxItems: 5, sort: "fastest" });
   });
 
   test("a failed search echoes the options it used, with defaults applied", async () => {
@@ -53,7 +53,7 @@ describe("/url", () => {
     const envelope = await response.json();
     expect(envelope).toMatchObject({
       status: "fail",
-      request: { searchUrl: SEARCH_URL + "?blocked=1", maxItems: 50, sorting: "best", fast: false },
+      request: { searchUrl: SEARCH_URL + "?blocked=1", maxItems: 50, sorting: "best" },
       result: null,
       failed: { code: "blocked", message: "search API returned 403" },
     });

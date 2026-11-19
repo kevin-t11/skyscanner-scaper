@@ -18,8 +18,6 @@ const options = (overrides: Partial<UnifiedSearchOptions> = {}): UnifiedSearchOp
   endpoint: "/e/",
   headers: {},
   body: { cabinClass: "ECONOMY", childAges: [], adults: 1, legs: [] },
-  enoughResults: 10,
-  stopWhenEnough: false,
   deadlineMs: 5_000,
   pollIntervalMs: 1,
   ...overrides,
@@ -66,13 +64,6 @@ describe("runUnifiedSearch", () => {
     const outcome = await runUnifiedSearch(page, options({ deadlineMs: 100 }));
     expect(performance.now() - startedAt).toBeLessThan(1_000);
     expect(outcome).toMatchObject({ timedOut: true, complete: false, resultCount: 1, httpStatus: 200 });
-  });
-
-  test("stops early in fast mode once enough results are known", async () => {
-    globalThis.fetch = (async () =>
-      Response.json({ context: { status: "incomplete", sessionId: "s" }, itineraries: { results: [{ id: "a" }, { id: "b" }] } })) as unknown as typeof fetch;
-    const outcome = await runUnifiedSearch(page, options({ stopWhenEnough: true, enoughResults: 2 }));
-    expect(outcome).toMatchObject({ complete: false, timedOut: false, upstreamRequests: 1, resultCount: 2 });
   });
 
   test("a network failure is httpStatus 0 and keeps earlier results", async () => {

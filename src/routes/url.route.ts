@@ -1,6 +1,6 @@
 /**
  * `POST /url` (JSON body), in one file:
- *   1. request:  `parseSearchRequest` validates url / max / sort / fast and applies defaults
+ *   1. request:  `parseSearchRequest` validates url / max / sort and applies defaults
  *   2. response: `SearchEnvelope` with `passEnvelope` / `failEnvelope`
  *   3. handler:  `createUrlRoute` checks the API key, runs the search, logs each step, saves the JSON
  */
@@ -28,7 +28,6 @@ export class InvalidRequestError extends Error {}
 export type RawSearchInput = Record<string, unknown>;
 
 const isBlank = (value: unknown) => value === undefined || value === null || value === "";
-const isTrue = (value: unknown) => value === true || value === "true" || value === "1";
 
 export function parseSearchRequest(input: RawSearchInput): FlightSearchRequest {
   const searchUrl = input.url;
@@ -45,14 +44,14 @@ export function parseSearchRequest(input: RawSearchInput): FlightSearchRequest {
     throw new InvalidRequestError(`\`sort\` must be one of ${SORT_ORDERS.join(", ")}`);
   }
 
-  return { searchUrl, maxItems, sort: sort as SortOrder, fast: isTrue(input.fast) };
+  return { searchUrl, maxItems, sort: sort as SortOrder };
 }
 
 /**
  * Best-effort echo of the caller's options for a failure envelope when the
  * input itself was invalid. Never throws; applies the same defaults.
  */
-export function describeRawInput(input: RawSearchInput): Pick<FlightSearchRequest, "fast"> & {
+export function describeRawInput(input: RawSearchInput): {
   searchUrl: string | null;
   maxItems: number | null;
   sort: string | null;
@@ -62,7 +61,6 @@ export function describeRawInput(input: RawSearchInput): Pick<FlightSearchReques
     searchUrl: typeof input.url === "string" ? input.url : null,
     maxItems: Number.isFinite(max) ? max : null,
     sort: isBlank(input.sort) ? DEFAULT_SORT : typeof input.sort === "string" ? input.sort : null,
-    fast: isTrue(input.fast),
   };
 }
 
@@ -80,11 +78,10 @@ export interface SearchRequestSummary {
   searchUrl: string | null;
   maxItems: number | null;
   sorting: string | null;
-  fast: boolean;
 }
 
 export interface SearchResultSummary {
-  /** False when stopped by `fast` or the deadline before Skyscanner finished. */
+  /** False when the deadline was reached before Skyscanner finished. */
   complete: boolean;
   /** Priced itineraries Skyscanner returned. */
   total: number;
@@ -109,7 +106,6 @@ const summarizeRequest = (request: FlightSearchRequest): SearchRequestSummary =>
   searchUrl: request.searchUrl,
   maxItems: request.maxItems,
   sorting: request.sort,
-  fast: request.fast,
 });
 
 export function passEnvelope(request: FlightSearchRequest, result: FlightSearchResult, timeElapsedMs: number): SearchEnvelope {
@@ -140,7 +136,7 @@ export function failEnvelope(
     request = summarizeRequest(source.request);
   } else {
     const raw = describeRawInput(source.input);
-    request = { searchUrl: raw.searchUrl, maxItems: raw.maxItems, sorting: raw.sort, fast: raw.fast };
+    request = { searchUrl: raw.searchUrl, maxItems: raw.maxItems, sorting: raw.sort };
   }
   return { status: "fail", timeElapsedMs, request, result: null, failed: failure };
 }
@@ -177,8 +173,8 @@ const formatInputValue = (value: unknown, fallback: string): string => {
 };
 
 const describeInput = (input: RawSearchInput) =>
-  `sort=${formatInputValue(input.sort, "best")} max=${formatInputValue(input.max, "50")}` +
-  `${input.fast ? ` fast=${formatInputValue(input.fast, "")}` : ""} url=${formatInputValue(input.url, "-")}`;
+  `sort=${formatInputValue(input.sort, "best")} max=${formatInputValue(input.max, "50")} ` +
+  `url=${formatInputValue(input.url, "-")}`;
 
 function logOutcome(log: Logger, envelope: SearchEnvelope): void {
   if (envelope.status === "pass" && envelope.result) {

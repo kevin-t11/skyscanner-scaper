@@ -19,9 +19,6 @@ export interface UnifiedSearchOptions {
   endpoint: string;
   headers: Record<string, string>;
   body: UnifiedSearchRequestBody;
-  /** With `stopWhenEnough`, stop once this many itineraries are known. */
-  enoughResults: number;
-  stopWhenEnough: boolean;
   deadlineMs: number;
   pollIntervalMs: number;
 }
@@ -100,7 +97,6 @@ export async function runUnifiedSearch(
   try {
     await step(options.endpoint, "POST", JSON.stringify(options.body));
     while (httpStatus === 200 && !failure && !timedOut && status !== "complete" && sessionId) {
-      if (options.stopWhenEnough && resultCount >= options.enoughResults) break;
       if (elapsedMs() + options.pollIntervalMs > options.deadlineMs) {
         timedOut = true;
         break;
