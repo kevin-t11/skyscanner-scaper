@@ -23,7 +23,12 @@ describe("/url", () => {
     const response = await get(`url=${encodeURIComponent(SEARCH_URL)}`);
     expect(response.status).toBe(200);
     expect(received.at(-1)).toEqual({ searchUrl: SEARCH_URL, maxItems: 50, sort: "best", fast: false });
-    expect(await response.json()).toMatchObject({ searchUrl: SEARCH_URL, maxItems: 50, sorting: "best", status: "pass", results: [], failed: {} });
+    expect(await response.json()).toMatchObject({
+      status: "pass",
+      request: { searchUrl: SEARCH_URL, maxItems: 50, sorting: "best", fast: false },
+      result: { complete: true, total: 0, count: 0, itineraries: [] },
+      failed: {},
+    });
   });
 
   test("POST with options", async () => {
@@ -40,11 +45,9 @@ describe("/url", () => {
     expect(response.status).toBe(502);
     const envelope = await response.json();
     expect(envelope).toMatchObject({
-      searchUrl: SEARCH_URL + "?blocked=1",
-      maxItems: 50,
-      sorting: "best",
       status: "fail",
-      results: [],
+      request: { searchUrl: SEARCH_URL + "?blocked=1", maxItems: 50, sorting: "best", fast: false },
+      result: null,
       failed: { code: "blocked", message: "search API returned 403" },
     });
     expect(typeof envelope.timeElapsedMs).toBe("number");
@@ -53,7 +56,7 @@ describe("/url", () => {
   test("POST with an object as max and no url still returns a 400 envelope", async () => {
     const response = await fetch(`${baseUrl}/url`, { method: "POST", body: JSON.stringify({ max: { a: 1 } }) });
     expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({ status: "fail", maxItems: null, failed: { code: "invalid_request" } });
+    expect(await response.json()).toMatchObject({ status: "fail", request: { maxItems: null }, result: null, failed: { code: "invalid_request" } });
   });
 
   test.each([

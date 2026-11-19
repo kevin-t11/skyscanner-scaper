@@ -56,25 +56,29 @@ Every response, success or failure, has the same shape:
 ```jsonc
 // abridged response from a live run
 {
-  "searchUrl": "https://www.skyscanner.co.in/transport/flights/del/blr/261218/?adultsv2=1&cabinclass=economy",
-  "maxItems": 20,
-  "sorting": "best",
-  "fast": false,
-  "status": "pass",                // "fail" on any error
-  "timeElapsedMs": 7235,
-  "complete": true,                // false when stopped by `fast` or the deadline
-  "total": 284,                    // itineraries Skyscanner returned
-  "count": 20,
-  "query": { "from": "del", "to": "blr", "dates": ["2026-12-18"], "adults": 1, "childAges": [], "cabin": "ECONOMY" },
-  "timings": { "resolveMs": 449, "searchMs": 6548, "firstResultsMs": 1319, "totalMs": 7235, "requests": 4 },
-  "results": [{
-    "id": "…", "price": 8856, "priceFormatted": "₹8,856", "score": 0.999, "tags": [ … ],
-    "durationMinutes": 175, "stops": 0, "isSelfTransfer": false, "emissionsKg": null,
-    "legs": [{ "origin": { "code": "DEL", … }, "destination": { "code": "BLR", … }, "departure": "…", "arrival": "…",
-               "durationMinutes": 175, "stops": 0, "carriers": [{ "code": "SG", "name": "SpiceJet", … }], "segments": [ … ] }],
-    "bookingOptions": [{ "agentId": "…", "agentName": "…", "price": 8856, "url": "https://www.skyscanner.co.in/transport_deeplink/…" }]
-  }],
-  "failed": {}                     // on fail: { "code": "blocked", "message": "search API returned 403" }
+  "status": "pass",                  // "fail" on any error
+  "timeElapsedMs": 6853,
+  "request": {                       // options the search ran with, defaults applied
+    "searchUrl": "https://www.skyscanner.co.in/transport/flights/blr/maa/261220/?adultsv2=1&cabinclass=economy",
+    "maxItems": 10,
+    "sorting": "fastest",
+    "fast": false
+  },
+  "result": {                        // null on fail
+    "complete": true,                // false when stopped by `fast` or the deadline
+    "total": 103,                    // priced itineraries Skyscanner returned
+    "count": 10,
+    "query": { "from": "blr", "to": "maa", "dates": ["2026-12-20"], "adults": 1, "childAges": [], "cabinClass": "ECONOMY" },
+    "timings": { "routeLookupMs": 372, "searchMs": 6423, "firstResultsMs": 497, "totalMs": 6852, "upstreamRequests": 5 },
+    "itineraries": [{
+      "id": "…", "price": 4099, "priceFormatted": "₹4,099", "score": …, "tags": [ … ],
+      "durationMinutes": 60, "stops": 0, "isSelfTransfer": false, "emissionsKg": null,
+      "legs": [{ "origin": { "code": "BLR", … }, "destination": { "code": "MAA", … }, "departure": "…", "arrival": "…",
+                 "durationMinutes": 60, "stops": 0, "carriers": [{ "code": "IX", "name": "Air India Express", … }], "segments": [ … ] }],
+      "bookingOptions": [{ "agentId": "…", "agentName": "…", "price": 4099, "url": "https://www.skyscanner.co.in/transport_deeplink/…" }]
+    }]
+  },
+  "failed": {}                       // on fail: { "code": "blocked", "message": "search API returned 403" }
 }
 ```
 
