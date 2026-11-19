@@ -310,6 +310,7 @@ What each folder and file is for, in the order a `/url` request passes through t
 | `.env.example` | Every setting with a comment; copy it to `.env` (the only place settings are read from) |
 | `DEPLOYMENT.md` | Lightsail deployment: first install, update, rollback, verification, operations |
 | `deploy/install.sh` | Installs xvfb, Chrome and Bun, creates `.env` on the first run, installs and restarts the `skyscanner` service |
+| `deploy/logs.sh` | Live service logs without systemd's date/host/pid prefix |
 | `deploy/check.sh` | After a deploy: waits for a ready browser, then runs one live search and prints pass/fail |
 | `deploy/skyscanner.service` | systemd unit template used by `install.sh` |
 | `.gitignore` | Keeps `.env`, `node_modules/`, HAR captures and `/output/` out of git |

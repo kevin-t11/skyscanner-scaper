@@ -61,7 +61,8 @@ Pass a Skyscanner URL to test a specific route: `bash deploy/check.sh '<search u
 
 | Task | Command |
 |---|---|
-| Live logs | `journalctl -u skyscanner -f` |
+| Live logs | `bash deploy/logs.sh` (only the scraper's lines; `-n 100 --no-pager` for the last 100) |
+| Only warnings and errors | `bash deploy/logs.sh \| grep -E "WARN\|ERROR"` |
 | Restart (e.g. after editing `.env`) | `sudo systemctl restart skyscanner` |
 | Stop / start | `sudo systemctl stop skyscanner` / `sudo systemctl start skyscanner` |
 
