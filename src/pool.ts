@@ -59,6 +59,8 @@ export class SessionPool {
   private readonly waiters = new Set<() => void>();
   private launchFailures = 0;
   private stopped = false;
+  /** Resolves on stop(), so launch backoff sleeps end immediately. */
+  private readonly stopping = Promise.withResolvers<void>();
   private stats = { launched: 0, retired: 0, launchErrors: 0 };
 
   constructor(private readonly config: Config) {}
@@ -125,6 +127,7 @@ export class SessionPool {
 
   async stop(): Promise<void> {
     this.stopped = true;
+    this.stopping.resolve();
     this.notify();
     await Promise.all([...this.warming].map((browser) => browser.close().catch(() => undefined)));
     await Promise.all(this.spawning);
@@ -139,7 +142,10 @@ export class SessionPool {
 
   private async launch(): Promise<void> {
     const id = crypto.randomUUID().replaceAll("-", "").slice(0, 12);
-    if (this.launchFailures) await Bun.sleep(RETRY_BACKOFF_MS[Math.min(this.launchFailures, RETRY_BACKOFF_MS.length) - 1]!);
+    if (this.launchFailures) {
+      const backoff = RETRY_BACKOFF_MS[Math.min(this.launchFailures, RETRY_BACKOFF_MS.length) - 1]!;
+      await Promise.race([Bun.sleep(backoff), this.stopping.promise]);
+    }
     if (this.stopped) return;
 
     let browser: Browser | undefined;
