@@ -214,6 +214,8 @@ PROXY_URL=http://USERNAME:PASSWORD_country-IN_session-{session}_lifetime-30@rp.e
 
 ## Deploy (AWS Lightsail / any Ubuntu server)
 
+The full release procedure (upload, staged test, backup, rollback, Caddy) is in [DEPLOYMENT.md](DEPLOYMENT.md).
+
 `deploy/setup-lightsail.sh` sets everything up in one run: Google Chrome, Xvfb (virtual display for the
 headful browser), Bun, a 2 GB swap file on small instances, the code, `.env`, a `skyscanner` systemd service,
 and a daily cleanup of `output/` files older than 7 days. Re-running it updates the code and restarts the service.
@@ -224,8 +226,9 @@ and a daily cleanup of `output/` files older than 7 days. Re-running it updates 
    curl -fsSL https://raw.githubusercontent.com/kevin-t11/skyscanner-scaper/main/deploy/setup-lightsail.sh -o setup.sh
    PROXY_URL='host:port:user:pass_session-{session}' POOL_SIZE=1 bash setup.sh
    ```
-   Optional: `API_KEY=...` (generated and printed when omitted), `BRANCH=...`, and `DOMAIN=api.example.com`
-   to add Caddy with automatic HTTPS (then open ports 80/443 in the Lightsail firewall).
+   Optional: `API_KEY=...` (generated and printed when omitted), `BRANCH=...`, and `DOMAIN` to add Caddy in front:
+   `DOMAIN=:80` serves the API on the server's IP over HTTP (open port 80 in the Lightsail firewall);
+   `DOMAIN=api.example.com` adds automatic HTTPS (open ports 80 and 443).
 3. Check it: `curl localhost:8000/health`, logs with `journalctl -u skyscanner -f`.
 
 The API listens on localhost only. Call it from the same machine, through Caddy (`DOMAIN`), or over an SSH
@@ -302,6 +305,7 @@ What each folder and file is for, in the order a `/url` request passes through t
 | `bun.lock` | Locked dependency versions |
 | `tsconfig.json` | TypeScript settings (strict mode) |
 | `.env.example` | Every environment variable with a comment; copy it to `.env` |
+| `DEPLOYMENT.md` | Lightsail release procedure: first-time setup, upload, staged test, backup, restart, verify, rollback |
 | `deploy/setup-lightsail.sh` | One-shot Ubuntu/Lightsail setup: Chrome, Xvfb, Bun, swap, code, `.env`, systemd service, output cleanup, optional Caddy HTTPS |
 | `.gitignore` | Keeps `.env`, `node_modules/`, HAR captures and `/output/` out of git |
 | `README.md` | This guide |

@@ -6,7 +6,8 @@
 #   curl -fsSL https://raw.githubusercontent.com/kevin-t11/skyscanner-scaper/main/deploy/setup-lightsail.sh -o setup.sh
 #   PROXY_URL='host:port:user:pass_session-{session}' API_KEY=secret bash setup.sh
 #
-# Optional env: POOL_SIZE (default 1), BRANCH (default main), DOMAIN (adds Caddy HTTPS for it).
+# Optional env: POOL_SIZE (default 1), BRANCH (default main),
+#   DOMAIN: adds Caddy in front; a domain gets HTTPS, DOMAIN=:80 serves plain HTTP on the server's IP.
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/kevin-t11/skyscanner-scaper.git}"
@@ -72,6 +73,8 @@ else
 fi
 APP_PORT="$(sed -nE 's/^PORT=([0-9]+).*/\1/p' "$APP_DIR/.env" | tail -1)"
 APP_PORT="${APP_PORT:-8000}"
+APP_POOL="$(sed -nE 's/^POOL_SIZE=([0-9]+).*/\1/p' "$APP_DIR/.env" | tail -1)"
+APP_POOL="${APP_POOL:-1}"
 
 step "systemd service"
 sudo tee "$SERVICE" >/dev/null <<UNIT
@@ -79,6 +82,9 @@ sudo tee "$SERVICE" >/dev/null <<UNIT
 Description=Skyscanner scraper (headful Chrome on a virtual display)
 After=network-online.target
 Wants=network-online.target
+# Stop restarting after 5 crashes in 60 s (e.g. Chrome missing or the port taken).
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 User=$APP_USER
@@ -86,6 +92,9 @@ WorkingDirectory=$APP_DIR
 ExecStart=/usr/bin/xvfb-run -a $BUN src/main.ts
 Restart=always
 RestartSec=5
+# ~700 MB per browser plus the server; systemd restarts the service if Chrome leaks past it.
+MemoryMax=$((600 + 700 * APP_POOL))M
+TimeoutStopSec=20
 
 [Install]
 WantedBy=multi-user.target
@@ -107,7 +116,7 @@ if [ -n "${DOMAIN:-}" ]; then
   fi
   printf '%s {\n\treverse_proxy localhost:%s\n}\n' "$DOMAIN" "$APP_PORT" | sudo tee /etc/caddy/Caddyfile >/dev/null
   sudo systemctl reload caddy || sudo systemctl restart caddy
-  echo "open ports 80 and 443 in the Lightsail firewall (Networking tab)"
+  echo "open port 80 (and 443 for a domain) in the Lightsail firewall (Networking tab)"
 fi
 
 step "Waiting for the first browser session"
