@@ -1,8 +1,8 @@
 /** Entry point: load config, start the browser pool and the HTTP server. */
 import { loadAppConfig } from "./config/app-config";
 import { createHttpServer } from "./server";
-import { createLogger, setLoggingEnabled } from "./logging/logger";
-import { FlightSearchService } from "./search/flight-search-service";
+import { createLogger, setLoggingEnabled } from "./utils/logger";
+import { FlightSearchService } from "./services/flight-search.service";
 import { SessionPool } from "./sessions/session-pool";
 
 const config = loadAppConfig();

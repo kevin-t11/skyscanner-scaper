@@ -4,7 +4,7 @@
  *   GET  /g/radar/api/v2/web-unified-search/{sessionId}   → poll until context.status === "complete"
  * Shapes below cover the fields this project reads; Skyscanner sends more.
  */
-import type { CabinClass, FlightSearchQuery } from "./search-url";
+import type { CabinClass, FlightSearchQuery } from "../parsers/search-url";
 
 export const UNIFIED_SEARCH_ENDPOINT = "/g/radar/api/v2/web-unified-search/";
 

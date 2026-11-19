@@ -4,7 +4,7 @@
  * everything else is a fixed setting below.
  */
 import { existsSync } from "node:fs";
-import { parseLoggingEnabled } from "../logging/logger";
+import { parseLoggingEnabled } from "../utils/logger";
 import { readDotEnv } from "./dotenv";
 
 /** Skyscanner site and market every session uses; results are priced in this currency. */

@@ -3,6 +3,7 @@
  *   https://www.skyscanner.com/transport/flights/{from}/{to}/{yymmdd}/[{yymmdd}/]?adultsv2=1&cabinclass=economy&childrenv2=4|9
  */
 import { InvalidSearchUrlError } from "../errors";
+import type { Place } from "../skyscanner/places";
 
 export type CabinClass = "ECONOMY" | "PREMIUM_ECONOMY" | "BUSINESS" | "FIRST";
 
@@ -79,4 +80,13 @@ export function parseSearchUrl(searchUrl: string): ParsedSearchUrl {
     },
     pathAndQuery: url.pathname + url.search,
   };
+}
+
+/** The website URL for a search: `{origin}/transport/flights/{from}/{to}/{yymmdd}/[{yymmdd}/]?adultsv2=…`. */
+export function buildSearchUrl(origin: string, query: FlightSearchQuery, places: { from: Place | null; to: Place | null }): string {
+  const code = (place: Place | null, text: string) => encodeURIComponent((place?.code ?? text).toLowerCase());
+  const dates = query.dates.map((iso) => `${iso.slice(2).replaceAll("-", "")}/`).join("");
+  const params = new URLSearchParams({ adultsv2: String(query.adults), cabinclass: query.cabinClass.toLowerCase().replace("_", "") });
+  if (query.childAges.length) params.set("childrenv2", query.childAges.join("|"));
+  return `${origin}/transport/flights/${code(places.from, query.from)}/${code(places.to, query.to)}/${dates}?${params}`;
 }

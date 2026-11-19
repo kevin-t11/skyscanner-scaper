@@ -1,14 +1,15 @@
-/** The `/url` use case: search URL → route entities → in-page API search → ranked itineraries. */
+/** The search use case (`/url`, `/search`): places → route entities → in-page API search → ranked itineraries; and `/places`. */
 import type { AppConfig } from "../config/app-config";
-import { BrowserError, SessionBlockedError, SessionNetworkError, UpstreamError } from "../errors";
-import { createLogger, formatDuration, type Logger } from "../logging/logger";
+import { BrowserError, PlaceNotFoundError, SessionBlockedError, SessionNetworkError, UpstreamError } from "../errors";
+import { createLogger, formatDuration, type Logger } from "../utils/logger";
 import type { BrowserSession } from "../sessions/browser-session";
 import type { SessionPool } from "../sessions/session-pool";
-import type { Itinerary, SortOrder } from "../skyscanner/itinerary";
-import { rankItineraries, type ItineraryCounts } from "../skyscanner/itinerary-normalizer";
+import type { Itinerary, SortOrder } from "../types/itinerary";
+import { rankItineraries, type ItineraryCounts } from "../parsers/itinerary-normalizer";
 import { lookupRouteEntitiesInPage, toPageExpression, type RouteLookupResult } from "../skyscanner/page-scripts";
 import { isChallengeUrl, solvePressAndHold } from "../skyscanner/px-challenge";
-import { parseSearchUrl, type FlightSearchQuery, type ParsedSearchUrl } from "../skyscanner/search-url";
+import { autosuggestInPage, normalizePlaces, pickPlace, type AutosuggestResult, type Place } from "../skyscanner/places";
+import { buildSearchUrl, type FlightSearchQuery } from "../parsers/search-url";
 import {
   buildUnifiedSearchBody,
   buildUnifiedSearchHeaders,
@@ -18,9 +19,23 @@ import {
 import { runUnifiedSearch, type UnifiedSearchOutcome } from "../skyscanner/unified-search-runner";
 
 export interface FlightSearchRequest {
-  searchUrl: string;
+  /** `from` / `to` are place codes (`/url`) or free text (`/search`). */
+  query: FlightSearchQuery;
   maxItems: number;
   sort: SortOrder;
+  /** `/url` only: places must match the URL's codes exactly; the search page is the fallback. */
+  pathAndQuery?: string;
+}
+
+/** What `from` / `to` resolved to; `null` when only the search-page fallback knew the code. */
+export interface RoutePlaces {
+  from: Place | null;
+  to: Place | null;
+}
+
+interface ResolvedRoute {
+  route: RouteEntities;
+  places: RoutePlaces;
 }
 
 export interface SearchTimings {
@@ -33,6 +48,9 @@ export interface SearchTimings {
 
 export interface FlightSearchResult {
   query: FlightSearchQuery;
+  places: RoutePlaces;
+  /** The same search on Skyscanner's website. */
+  searchUrl: string;
   /** False when the deadline was reached before Skyscanner finished. */
   complete: boolean;
   counts: ItineraryCounts;
@@ -43,6 +61,8 @@ export interface FlightSearchResult {
 export interface FlightSearch {
   /** `log` receives one line per step (session, route lookup, each poll); defaults to a `search` logger. */
   search(request: FlightSearchRequest, log?: Logger): Promise<FlightSearchResult>;
+  /** Autocomplete for the "From" (`isDestination` false) or "To" box. */
+  suggestPlaces(text: string, isDestination: boolean): Promise<Place[]>;
 }
 
 const POLL_INTERVAL_MS = 600;
@@ -51,13 +71,14 @@ const REQUEST_TIMEOUT_MS = 6_000;
 /** With STOP_WHEN_STABLE, stop after the first poll that adds no itineraries. */
 const STABLE_POLLS = 1;
 const ROUTE_LOOKUP_TIMEOUT_MS = 10_000;
+const PLACES_TIMEOUT_MS = 5_000;
 const ROUTE_CACHE_LIMIT = 10_000;
 /** One retry on a fresh session after a block; more mostly burns proxy bandwidth. */
 const MAX_ATTEMPTS = 2;
 
 export class FlightSearchService implements FlightSearch {
-  /** `from|to` → entity ids; place codes map to the same entities forever. */
-  private readonly routeCache = new Map<string, RouteEntities>();
+  private readonly routeCache = new Map<string, ResolvedRoute>();
+  private readonly placeCache = new Map<string, Place[]>();
 
   constructor(
     private readonly pool: SessionPool,
@@ -66,14 +87,12 @@ export class FlightSearchService implements FlightSearch {
 
   async search(request: FlightSearchRequest, log: Logger = createLogger("search", { timed: true })): Promise<FlightSearchResult> {
     const startedAt = performance.now();
-    const parsedUrl = parseSearchUrl(request.searchUrl);
-
     let challengeTried = false;
     for (let attempt = 1; ; attempt++) {
       const session = await this.pool.acquire();
       log.info(`session ${session.id} acquired${attempt > 1 ? ` (retry ${attempt - 1})` : ""}`);
       try {
-        const result = await session.run(() => this.searchOnSession(session, parsedUrl, request, startedAt, log));
+        const result = await session.run(() => this.searchOnSession(session, request, startedAt, log));
         this.pool.recordSuccess();
         return result;
       } catch (error) {
@@ -103,18 +122,29 @@ export class FlightSearchService implements FlightSearch {
     }
   }
 
+  async suggestPlaces(text: string, isDestination: boolean): Promise<Place[]> {
+    const session = await this.pool.acquire();
+    try {
+      return await session.run(() => this.placesOnSession(session, text, isDestination));
+    } catch (error) {
+      if (error instanceof SessionBlockedError || error instanceof SessionNetworkError || error instanceof BrowserError) {
+        this.pool.retire(session, (error as Error).message);
+      }
+      throw error;
+    }
+  }
+
   private async searchOnSession(
     session: BrowserSession,
-    parsedUrl: ParsedSearchUrl,
     request: FlightSearchRequest,
     startedAt: number,
     log: Logger,
   ): Promise<FlightSearchResult> {
     const lookupStartedAt = performance.now();
-    const route = await this.resolveRoute(session, parsedUrl, log);
+    const { route, places } = await this.resolveRoute(session, request, log);
     const routeLookupMs = Math.round(performance.now() - lookupStartedAt);
 
-    const outcome = await this.runUnifiedSearch(session, parsedUrl.query, route, request, log);
+    const outcome = await this.runUnifiedSearch(session, request.query, route, request, log);
     const { counts, itineraries } = rankItineraries(outcome.payloadJson, request.sort, request.maxItems, this.pool.origin);
     const stoppedBy = outcome.complete ? "complete" : outcome.timedOut ? "deadline reached" : outcome.stable ? "stable" : "partial";
     log.info(
@@ -122,7 +152,9 @@ export class FlightSearchService implements FlightSearch {
         (outcome.firstResultsMs === null ? "" : `, first results ${formatDuration(outcome.firstResultsMs)}`),
     );
     return {
-      query: parsedUrl.query,
+      query: request.query,
+      places,
+      searchUrl: buildSearchUrl(this.pool.origin, request.query, places),
       complete: outcome.complete,
       counts,
       itineraries,
@@ -136,8 +168,10 @@ export class FlightSearchService implements FlightSearch {
     };
   }
 
-  private async resolveRoute(session: BrowserSession, { query, pathAndQuery }: ParsedSearchUrl, log: Logger): Promise<RouteEntities> {
-    const cacheKey = `${query.from}|${query.to}`;
+  /** Place codes and names map to the same entities forever, so routes are cached by input text. */
+  private async resolveRoute(session: BrowserSession, request: FlightSearchRequest, log: Logger): Promise<ResolvedRoute> {
+    const { query, pathAndQuery } = request;
+    const cacheKey = `${query.from}|${query.to}`.toLowerCase();
     const cached = this.routeCache.get(cacheKey);
     if (cached) {
       log.info(`route ${query.from}→${query.to} cached`);
@@ -145,6 +179,63 @@ export class FlightSearchService implements FlightSearch {
     }
     const lookupStartedAt = performance.now();
 
+    // A URL holds exact place codes; free text (`/search`) takes the top suggestion.
+    const exactOnly = pathAndQuery !== undefined;
+    const [from, to] = await Promise.all([
+      this.placesOnSession(session, query.from, false).then((places) => pickPlace(places, query.from, exactOnly)),
+      this.placesOnSession(session, query.to, true).then((places) => pickPlace(places, query.to, exactOnly)),
+    ]);
+
+    let resolved: ResolvedRoute;
+    if (from && to) {
+      resolved = {
+        route: {
+          originEntityId: from.entityId,
+          destinationEntityId: to.entityId,
+          destinationCityEntityId: to.type === "city" ? to.entityId : undefined,
+        },
+        places: { from, to },
+      };
+    } else if (pathAndQuery) {
+      resolved = { route: await this.lookupRouteFromPage(session, pathAndQuery, query), places: { from: from ?? null, to: to ?? null } };
+    } else {
+      throw new PlaceNotFoundError(`no airport or city matches "${from ? query.to : query.from}"`);
+    }
+
+    if (this.routeCache.size >= ROUTE_CACHE_LIMIT) this.routeCache.clear();
+    this.routeCache.set(cacheKey, resolved);
+    const label = (text: string, place: Place | null) => (place ? `${text}=${place.name} (${place.code}, ${place.type})` : text);
+    log.info(
+      `places resolved · ${label(query.from, resolved.places.from)} → ${label(query.to, resolved.places.to)} ` +
+        `in ${formatDuration(performance.now() - lookupStartedAt)}`,
+    );
+    return resolved;
+  }
+
+  /** Autocomplete suggestions for `text`; blocks and network failures are the session's, like a search. */
+  private async placesOnSession(session: BrowserSession, text: string, isDestination: boolean): Promise<Place[]> {
+    const cacheKey = `${isDestination ? "to" : "from"}|${text.trim().toLowerCase()}`;
+    const cached = this.placeCache.get(cacheKey);
+    if (cached) return cached;
+    session.upstreamRequests++;
+    const { market, locale } = this.config;
+    const result = await session.browser.evaluate<AutosuggestResult>(
+      toPageExpression(autosuggestInPage, { market, locale, text: text.trim(), isDestination, timeoutMs: PLACES_TIMEOUT_MS }),
+    );
+    if (result.failure === "network") throw new SessionNetworkError("place autocomplete failed: network error");
+    if (result.failure === "timeout") throw new SessionNetworkError(`place autocomplete timed out after ${PLACES_TIMEOUT_MS} ms`);
+    if (result.status === 403) throw new SessionBlockedError("place autocomplete returned 403");
+    if (result.status !== 200 || result.failure) {
+      throw new UpstreamError(`place autocomplete returned HTTP ${result.status}${result.failure ? ` (${result.failure})` : ""}`);
+    }
+    const places = normalizePlaces(result.places);
+    if (this.placeCache.size >= ROUTE_CACHE_LIMIT) this.placeCache.clear();
+    this.placeCache.set(cacheKey, places);
+    return places;
+  }
+
+  /** Fallback for URL codes autocomplete does not know exactly: the search page's own entity ids. */
+  private async lookupRouteFromPage(session: BrowserSession, pathAndQuery: string, query: FlightSearchQuery): Promise<RouteEntities> {
     session.upstreamRequests++;
     const lookup = await session.browser.evaluate<RouteLookupResult>(
       toPageExpression(lookupRouteEntitiesInPage, { pathAndQuery, timeoutMs: ROUTE_LOOKUP_TIMEOUT_MS }),
@@ -154,21 +245,13 @@ export class FlightSearchService implements FlightSearch {
     if (isChallengeUrl(lookup.finalUrl)) throw new SessionBlockedError("search page challenged", lookup.finalUrl);
     if (lookup.status === 403) throw new SessionBlockedError("search page returned 403");
     if (!lookup.originEntityId || !lookup.destinationEntityId) {
-      throw new UpstreamError(`could not resolve places "${query.from}" / "${query.to}" (HTTP ${lookup.status})`);
+      throw new PlaceNotFoundError(`could not resolve places "${query.from}" / "${query.to}" (HTTP ${lookup.status})`);
     }
-
-    const route: RouteEntities = {
+    return {
       originEntityId: lookup.originEntityId,
       destinationEntityId: lookup.destinationEntityId,
       destinationCityEntityId: lookup.destinationCityEntityId,
     };
-    if (this.routeCache.size >= ROUTE_CACHE_LIMIT) this.routeCache.clear();
-    this.routeCache.set(cacheKey, route);
-    log.info(
-      `url fetched · route ${query.from}=${route.originEntityId} → ${query.to}=${route.destinationEntityId} ` +
-        `in ${formatDuration(performance.now() - lookupStartedAt)}`,
-    );
-    return route;
   }
 
   private async runUnifiedSearch(

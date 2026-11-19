@@ -4,7 +4,7 @@
  * as the Zillow scraper's minter, over raw CDP input events.
  */
 import type { ChromeBrowser } from "../browser/chrome-browser";
-import { formatDuration, type Logger } from "../logging/logger";
+import { formatDuration, type Logger } from "../utils/logger";
 
 const HOLD_BUTTON = "#px-captcha";
 const BUTTON_WAIT_MS = 8_000;
