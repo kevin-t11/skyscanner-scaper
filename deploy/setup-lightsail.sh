@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One-shot setup for an Ubuntu (22.04/24.04) Lightsail instance: installs Chrome, Xvfb and Bun,
-# clones the scraper, writes .env and runs it as a systemd service on localhost:8000.
+# clones the scraper, writes .env and runs it as a systemd service on localhost (PORT, default 8000).
 # Safe to re-run: it updates the code and restarts the service.
 #
 #   curl -fsSL https://raw.githubusercontent.com/kevin-t11/skyscanner-scaper/main/deploy/setup-lightsail.sh -o setup.sh
@@ -70,6 +70,8 @@ ENV
 else
   echo "keeping existing $APP_DIR/.env"
 fi
+APP_PORT="$(sed -nE 's/^PORT=([0-9]+).*/\1/p' "$APP_DIR/.env" | tail -1)"
+APP_PORT="${APP_PORT:-8000}"
 
 step "systemd service"
 sudo tee "$SERVICE" >/dev/null <<UNIT
@@ -103,18 +105,18 @@ if [ -n "${DOMAIN:-}" ]; then
     curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
     sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq caddy >/dev/null
   fi
-  echo "$DOMAIN { reverse_proxy localhost:8000 }" | sudo tee /etc/caddy/Caddyfile >/dev/null
+  printf '%s {\n\treverse_proxy localhost:%s\n}\n' "$DOMAIN" "$APP_PORT" | sudo tee /etc/caddy/Caddyfile >/dev/null
   sudo systemctl reload caddy || sudo systemctl restart caddy
   echo "open ports 80 and 443 in the Lightsail firewall (Networking tab)"
 fi
 
 step "Waiting for the first browser session"
 for _ in $(seq 1 60); do
-  if curl -fs localhost:8000/health 2>/dev/null | grep -q '"ready":[1-9]'; then
-    echo "ready: $(curl -fs localhost:8000/health | head -c 200)"
+  if curl -fs "localhost:$APP_PORT/health" 2>/dev/null | grep -q '"ready":[1-9]'; then
+    echo "ready: $(curl -fs "localhost:$APP_PORT/health" | head -c 200)"
     echo
     echo "logs:   journalctl -u skyscanner -f"
-    echo "search: curl localhost:8000/url -H 'x-api-key: <API_KEY>' -H 'content-type: application/json' -d '{\"url\":\"<skyscanner url>\",\"max\":10,\"sort\":\"cheapest\"}'"
+    echo "search: curl localhost:$APP_PORT/url -H 'x-api-key: <API_KEY>' -H 'content-type: application/json' -d '{\"url\":\"<skyscanner url>\",\"max\":10,\"sort\":\"cheapest\"}'"
     exit 0
   fi
   sleep 2
