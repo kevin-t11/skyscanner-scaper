@@ -24,6 +24,10 @@ export interface Logger {
   elapsedMs(): number;
 }
 
+/** Escapes control characters (newlines included) so caller-supplied text can't forge extra log lines. */
+const escapeControlCharacters = (text: string) =>
+  text.replace(/[\u0000-\u001f\u007f]/g, (char) => (char === "\n" ? "\\n" : char === "\r" ? "\\r" : `\\x${char.charCodeAt(0).toString(16).padStart(2, "0")}`));
+
 const clockTime = (date: Date) =>
   `${date.toTimeString().slice(0, 8)}.${String(date.getMilliseconds()).padStart(3, "0")}`;
 
@@ -34,7 +38,7 @@ export function createLogger(scope: string, options: { timed?: boolean } = {}): 
   const write = (level: LogLevel, message: string) => {
     if (LEVEL_RANK[level] < LEVEL_RANK[minimumLevel]) return;
     const elapsed = options.timed ? ` +${(elapsedMs() / 1000).toFixed(2)}s` : "";
-    const line = `${clockTime(new Date())} ${level.toUpperCase().padEnd(5)} [${scope}${elapsed}] ${message}`;
+    const line = `${clockTime(new Date())} ${level.toUpperCase().padEnd(5)} [${scope}${elapsed}] ${escapeControlCharacters(message)}`;
     (level === "error" || level === "warn" ? console.error : console.log)(line);
   };
 

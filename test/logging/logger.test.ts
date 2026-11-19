@@ -13,6 +13,16 @@ test("formats compact lines with scope and elapsed time", () => {
   }
 });
 
+test("escapes newlines so a message stays on one line", () => {
+  const output = spyOn(console, "log").mockImplementation(() => {});
+  try {
+    createLogger("req abc123").info("url=x\n12:00:00.000 INFO  [server] forged\r\u0007");
+    expect(output.mock.calls[0]![0]).toEndWith("url=x\\n12:00:00.000 INFO  [server] forged\\r\\x07");
+  } finally {
+    output.mockRestore();
+  }
+});
+
 test("drops lines below the configured level", () => {
   const output = spyOn(console, "log").mockImplementation(() => {});
   try {
