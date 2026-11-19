@@ -51,34 +51,40 @@ xvfb-run -a bun start         # or `bun start` on a machine with a display
 Query parameters read from the URL: `adultsv2`, `childrenv2` (`4\|9`), `cabinclass`
 (`economy`, `premiumeconomy`, `business`, `first`).
 
+Every response, success or failure, has the same shape:
+
 ```jsonc
 // abridged response from a live run
 {
-  "query": { "from": "san", "to": "sfo", "dates": ["2026-12-10", "2026-12-20"], "adults": 1, "childAges": [], "cabin": "ECONOMY" },
-  "sort": "cheapest",
-  "complete": true,              // false when stopped by `fast` or the deadline
-  "total": 814,                  // itineraries Skyscanner returned
+  "searchUrl": "https://www.skyscanner.co.in/transport/flights/del/blr/261218/?adultsv2=1&cabinclass=economy",
+  "maxItems": 20,
+  "sorting": "best",
+  "fast": false,
+  "status": "pass",                // "fail" on any error
+  "timeElapsedMs": 7235,
+  "complete": true,                // false when stopped by `fast` or the deadline
+  "total": 284,                    // itineraries Skyscanner returned
   "count": 20,
-  "timings": { "resolveMs": 0, "searchMs": 11457, "firstResultsMs": 906, "totalMs": 11753, "requests": 6 },
-  "itineraries": [{
-    "id": "16088-2612101405--32289-0-16216-2612101541|…",
-    "price": 10646.0, "priceFormatted": "₹10,646", "score": 0.999, "tags": ["cheapest"],
-    "durationMinutes": 216, "stops": 0, "isSelfTransfer": false, "emissionsKg": null,
-    "legs": [{ "origin": { "code": "SAN", "name": "San Diego", "entityId": "95673473" }, "destination": { … },
-               "departure": "2026-12-10T14:05:00", "arrival": "2026-12-10T15:41:00", "durationMinutes": 96, "stops": 0,
-               "carriers": [{ "code": "F9", "name": "Frontier Airlines", "logoUrl": "…" }],
-               "segments": [{ "flightNumber": "F93383", "marketingCarrier": "Frontier Airlines", … }] }],
-    "bookingOptions": [{ "agentId": "fron", "agentName": "Frontier", "price": 10646.0, "url": "https://www.skyscanner.co.in/transport_deeplink/…" }]
-  }]
+  "query": { "from": "del", "to": "blr", "dates": ["2026-12-18"], "adults": 1, "childAges": [], "cabin": "ECONOMY" },
+  "timings": { "resolveMs": 449, "searchMs": 6548, "firstResultsMs": 1319, "totalMs": 7235, "requests": 4 },
+  "results": [{
+    "id": "…", "price": 8856, "priceFormatted": "₹8,856", "score": 0.999, "tags": [ … ],
+    "durationMinutes": 175, "stops": 0, "isSelfTransfer": false, "emissionsKg": null,
+    "legs": [{ "origin": { "code": "DEL", … }, "destination": { "code": "BLR", … }, "departure": "…", "arrival": "…",
+               "durationMinutes": 175, "stops": 0, "carriers": [{ "code": "SG", "name": "SpiceJet", … }], "segments": [ … ] }],
+    "bookingOptions": [{ "agentId": "…", "agentName": "…", "price": 8856, "url": "https://www.skyscanner.co.in/transport_deeplink/…" }]
+  }],
+  "failed": {}                     // on fail: { "code": "blocked", "message": "search API returned 403" }
 }
 ```
 
-| Status | Meaning |
-|---|---|
-| 400 | Invalid parameters or not a flight search URL |
-| 401 | `API_KEY` is set and `x-api-key` is missing or wrong |
-| 502 | Blocked by PerimeterX twice (sessions are replaced automatically), no results before the deadline, or upstream error |
-| 503 | No browser session ready yet |
+| HTTP | `failed.code` | Meaning |
+|---|---|---|
+| 400 | `invalid_request` | Invalid parameters or not a flight search URL |
+| 401 | `unauthorized` | `API_KEY` is set and `x-api-key` is missing or wrong |
+| 502 | `blocked` / `upstream_error` | Blocked by PerimeterX twice (sessions are replaced automatically), no results before the deadline, or another upstream error |
+| 503 | `no_session` | No browser session ready yet |
+| 500 | `internal_error` | Unexpected error (logged) |
 
 ### `GET /health`
 Pool state: ready sessions, launches, retirements, and per-session request counts.

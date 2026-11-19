@@ -17,10 +17,33 @@ afterAll(() => server.stop());
 const URL_ = "https://www.skyscanner.com/transport/flights/lhr/jfk/261215/";
 
 describe("/url", () => {
-  test("GET with defaults", async () => {
+  test("GET with defaults returns a pass envelope", async () => {
     const res = await fetch(`${base}/url?url=${encodeURIComponent(URL_)}`);
     expect(res.status).toBe(200);
     expect(calls.at(-1)).toEqual({ url: URL_, max: 50, sort: "best", fast: false });
+    expect(await res.json()).toMatchObject({
+      searchUrl: URL_,
+      maxItems: 50,
+      sorting: "best",
+      status: "pass",
+      results: [],
+      failed: {},
+    });
+  });
+
+  test("failures use the same envelope", async () => {
+    const res = await fetch(`${base}/url?max=5&sort=cheapest&url=${encodeURIComponent(URL_ + "?blocked=1")}`);
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      searchUrl: URL_ + "?blocked=1",
+      maxItems: 5,
+      sorting: "cheapest",
+      status: "fail",
+      results: [],
+      failed: { code: "blocked", message: "search API returned 403" },
+    });
+    expect(typeof body.timeElapsedMs).toBe("number");
   });
 
   test("POST with options", async () => {
