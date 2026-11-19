@@ -17,7 +17,7 @@ interface DateFieldProps {
   min: string;
 }
 
-/** One calendar for both trip types. One-way keeps a single day: a later click arrives as `to` and becomes the new departure. */
+/** One calendar for both trip types; one-way keeps only the day just clicked. */
 export function DateField({ trip, value, onChange, min }: DateFieldProps) {
   const summary = !value?.from
     ? trip === "return" ? "Depart and return" : "Depart"
@@ -27,7 +27,11 @@ export function DateField({ trip, value, onChange, min }: DateFieldProps) {
   return (
     <DateRangePicker
       value={value}
-      onValueChange={(range) => onChange(range && trip === "oneway" ? { from: range.to ?? range.from } : range)}
+      onValueChange={(range) => {
+        if (!range || trip === "return") return onChange(range);
+        // The picker orders the two clicks, so the new day is whichever end differs from the current departure.
+        onChange({ from: range.from !== value?.from ? range.from : (range.to ?? range.from) });
+      }}
       min={min}
       closeOnSelect
       showSummary={false}
