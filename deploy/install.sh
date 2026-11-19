@@ -38,7 +38,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable -q skyscanner
 sudo systemctl restart skyscanner
 
-PORT="$(sed -nE 's/^PORT=([0-9]+).*/\1/p' .env)"
+PORT="$(sed -nE 's/^PORT=([0-9]+).*/\1/p' .env | tail -1)"
 echo "==> waiting for a browser session on port ${PORT:-8000}"
 for _ in $(seq 60); do
   if curl -fs "localhost:${PORT:-8000}/health" | grep -q '"ready":[1-9]'; then
