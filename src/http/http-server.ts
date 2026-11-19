@@ -42,8 +42,16 @@ const newRequestId = () => crypto.randomUUID().slice(0, 6);
 const envelopeResponse = (envelope: SearchEnvelope, requestId: string, code?: FailureCode) =>
   Response.json(envelope, { status: code ? HTTP_STATUS[code] : 200, headers: { "x-request-id": requestId } });
 
+/** Formats an unvalidated input value for a log line; never throws, whatever the caller sent. */
+const formatInputValue = (value: unknown, fallback: string): string => {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  return `<${Array.isArray(value) ? "array" : typeof value}>`;
+};
+
 const describeInput = (input: RawSearchInput) =>
-  `sort=${input.sort ?? "best"} max=${input.max ?? 50}${input.fast ? ` fast=${input.fast}` : ""} url=${input.url ?? "-"}`;
+  `sort=${formatInputValue(input.sort, "best")} max=${formatInputValue(input.max, "50")}` +
+  `${input.fast ? ` fast=${formatInputValue(input.fast, "")}` : ""} url=${formatInputValue(input.url, "-")}`;
 
 function logOutcome(log: Logger, envelope: SearchEnvelope): void {
   if (envelope.status === "pass" && envelope.result) {

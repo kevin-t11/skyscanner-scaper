@@ -65,6 +65,13 @@ describe("/url", () => {
     expect(await response.json()).toMatchObject({ status: "fail", request: { maxItems: null }, result: null, failed: { code: "invalid_request" } });
   });
 
+  test("POST with a field that cannot be stringified returns a 400 envelope", async () => {
+    const response = await fetch(`${baseUrl}/url`, { method: "POST", body: JSON.stringify({ url: SEARCH_URL, max: { toString: null } }) });
+    expect(response.status).toBe(400);
+    expect(response.headers.get("x-request-id")).toBeTruthy();
+    expect((await response.json()).failed.code).toBe("invalid_request");
+  });
+
   test.each([
     [`max=0&url=${encodeURIComponent(SEARCH_URL)}`, 400],
     [`sort=random&url=${encodeURIComponent(SEARCH_URL)}`, 400],
