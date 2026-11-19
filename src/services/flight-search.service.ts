@@ -9,7 +9,7 @@ import { rankItineraries, type ItineraryCounts } from "../parsers/itinerary-norm
 import { lookupRouteEntitiesInPage, toPageExpression, type RouteLookupResult } from "../skyscanner/page-scripts";
 import { isChallengeUrl, solvePressAndHold } from "../skyscanner/px-challenge";
 import { autosuggestInPage, normalizePlaces, pickPlace, type AutosuggestResult, type Place } from "../skyscanner/places";
-import { buildSearchUrl, type FlightSearchQuery } from "../parsers/search-url";
+import { buildSearchPath, buildSearchUrl, type FlightSearchQuery } from "../parsers/search-url";
 import {
   buildUnifiedSearchBody,
   buildUnifiedSearchHeaders,
@@ -72,6 +72,8 @@ const REQUEST_TIMEOUT_MS = 6_000;
 const STABLE_POLLS = 1;
 const ROUTE_LOOKUP_TIMEOUT_MS = 10_000;
 const PLACES_TIMEOUT_MS = 5_000;
+/** A Skyscanner place code as a caller would type it: `BOM`, `NYCA`. */
+const PLACE_CODE = /^[A-Z]{3,4}$/;
 const ROUTE_CACHE_LIMIT = 10_000;
 /** One retry on a fresh session after a block; more mostly burns proxy bandwidth. */
 const MAX_ATTEMPTS = 2;
@@ -196,8 +198,10 @@ export class FlightSearchService implements FlightSearch {
         },
         places: { from, to },
       };
-    } else if (pathAndQuery) {
-      resolved = { route: await this.lookupRouteFromPage(session, pathAndQuery, query), places: { from: from ?? null, to: to ?? null } };
+    } else if (pathAndQuery || [from ? null : query.from, to ? null : query.to].every((text) => text === null || PLACE_CODE.test(text))) {
+      // Codes autocomplete does not return (e.g. `NYCA`, `DXBA`): the search page knows them.
+      const path = pathAndQuery ?? buildSearchPath(query, { from: from ?? null, to: to ?? null });
+      resolved = { route: await this.lookupRouteFromPage(session, path, query), places: { from: from ?? null, to: to ?? null } };
     } else {
       throw new PlaceNotFoundError(`no airport or city matches "${from ? query.to : query.from}"`);
     }

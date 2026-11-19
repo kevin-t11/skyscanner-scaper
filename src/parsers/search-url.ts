@@ -82,11 +82,16 @@ export function parseSearchUrl(searchUrl: string): ParsedSearchUrl {
   };
 }
 
-/** The website URL for a search: `{origin}/transport/flights/{from}/{to}/{yymmdd}/[{yymmdd}/]?adultsv2=…`. */
+/** The website URL for a search. */
 export function buildSearchUrl(origin: string, query: FlightSearchQuery, places: { from: Place | null; to: Place | null }): string {
+  return origin + buildSearchPath(query, places);
+}
+
+/** Path and query of the website search: `/transport/flights/{from}/{to}/{yymmdd}/[{yymmdd}/]?adultsv2=…`. */
+export function buildSearchPath(query: FlightSearchQuery, places: { from: Place | null; to: Place | null }): string {
   const code = (place: Place | null, text: string) => encodeURIComponent((place?.code ?? text).toLowerCase());
   const dates = query.dates.map((iso) => `${iso.slice(2).replaceAll("-", "")}/`).join("");
   const params = new URLSearchParams({ adultsv2: String(query.adults), cabinclass: query.cabinClass.toLowerCase().replace("_", "") });
   if (query.childAges.length) params.set("childrenv2", query.childAges.join("|"));
-  return `${origin}/transport/flights/${code(places.from, query.from)}/${code(places.to, query.to)}/${dates}?${params}`;
+  return `/transport/flights/${code(places.from, query.from)}/${code(places.to, query.to)}/${dates}?${params}`;
 }
