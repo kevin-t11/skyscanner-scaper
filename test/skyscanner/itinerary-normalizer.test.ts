@@ -28,8 +28,8 @@ describe("rankItineraries", () => {
   };
 
   test.each(["best", "cheapest", "fastest"] as const)("sorts by %s", (sort) => {
-    const { itineraries, total } = rankItineraries(JSON.stringify(payload), sort, 10, SITE_ORIGIN);
-    expect(total).toBe(payload.results.length);
+    const { itineraries, counts } = rankItineraries(JSON.stringify(payload), sort, 10, SITE_ORIGIN);
+    expect(counts).toEqual({ received: payload.results.length, passed: payload.results.length, failed: 0 });
     const keys = itineraries.map(sortKey[sort]);
     expect(keys).toEqual([...keys].sort((a, b) => a - b));
   });

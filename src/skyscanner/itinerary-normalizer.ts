@@ -74,9 +74,17 @@ const COMPARE_BY: Record<SortOrder, (a: Itinerary, b: Itinerary) => number> = {
   fastest: (a, b) => a.durationMinutes - b.durationMinutes || a.price - b.price,
 };
 
+export interface ItineraryCounts {
+  /** Itineraries Skyscanner returned. */
+  received: number;
+  /** Parsed successfully and priced. */
+  passed: number;
+  /** Dropped: no price or malformed data. */
+  failed: number;
+}
+
 export interface RankedItineraries {
-  /** Priced itineraries Skyscanner returned. */
-  total: number;
+  counts: ItineraryCounts;
   /** The first `maxItems` after sorting. */
   itineraries: Itinerary[];
 }
@@ -90,9 +98,16 @@ export function rankItineraries(
 ): RankedItineraries {
   const { results, agents }: UnifiedSearchPayload = typeof payload === "string" ? JSON.parse(payload) : payload;
   const agentNames = new Map(agents.map((agent) => [agent.id, agent.name]));
-  const itineraries = results
-    .map((raw) => normalizeItinerary(raw, agentNames, siteOrigin))
-    .filter((itinerary) => Number.isFinite(itinerary.price))
-    .sort(COMPARE_BY[sort]);
-  return { total: itineraries.length, itineraries: itineraries.slice(0, maxItems) };
+  const itineraries: Itinerary[] = [];
+  for (const raw of results) {
+    try {
+      const itinerary = normalizeItinerary(raw, agentNames, siteOrigin);
+      if (Number.isFinite(itinerary.price)) itineraries.push(itinerary);
+    } catch {
+      // Counted as failed below; one malformed itinerary must not fail the search.
+    }
+  }
+  itineraries.sort(COMPARE_BY[sort]);
+  const counts = { received: results.length, passed: itineraries.length, failed: results.length - itineraries.length };
+  return { counts, itineraries: itineraries.slice(0, maxItems) };
 }

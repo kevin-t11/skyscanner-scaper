@@ -5,7 +5,7 @@ import { createLogger, formatDuration, type Logger } from "../logging/logger";
 import type { BrowserSession } from "../sessions/browser-session";
 import type { SessionPool } from "../sessions/session-pool";
 import type { Itinerary, SortOrder } from "../skyscanner/itinerary";
-import { rankItineraries } from "../skyscanner/itinerary-normalizer";
+import { rankItineraries, type ItineraryCounts } from "../skyscanner/itinerary-normalizer";
 import { lookupRouteEntitiesInPage, toPageExpression, type RouteLookupResult } from "../skyscanner/page-scripts";
 import { parseSearchUrl, type FlightSearchQuery, type ParsedSearchUrl } from "../skyscanner/search-url";
 import {
@@ -34,7 +34,7 @@ export interface FlightSearchResult {
   query: FlightSearchQuery;
   /** False when the deadline was reached before Skyscanner finished. */
   complete: boolean;
-  total: number;
+  counts: ItineraryCounts;
   itineraries: Itinerary[];
   timings: SearchTimings;
 }
@@ -95,16 +95,16 @@ export class FlightSearchService implements FlightSearch {
     const routeLookupMs = Math.round(performance.now() - lookupStartedAt);
 
     const outcome = await this.runUnifiedSearch(session, parsedUrl.query, route, request, log);
-    const { total, itineraries } = rankItineraries(outcome.payloadJson, request.sort, request.maxItems, this.pool.origin);
+    const { counts, itineraries } = rankItineraries(outcome.payloadJson, request.sort, request.maxItems, this.pool.origin);
     const stoppedBy = outcome.complete ? "complete" : outcome.timedOut ? "deadline reached" : "partial";
     log.info(
-      `${stoppedBy} · ${total} flights in ${outcome.upstreamRequests} request${outcome.upstreamRequests === 1 ? "" : "s"} · search ${formatDuration(outcome.elapsedMs)}` +
+      `${stoppedBy} · ${counts.passed}/${counts.received} flights parsed in ${outcome.upstreamRequests} request${outcome.upstreamRequests === 1 ? "" : "s"} · search ${formatDuration(outcome.elapsedMs)}` +
         (outcome.firstResultsMs === null ? "" : `, first results ${formatDuration(outcome.firstResultsMs)}`),
     );
     return {
       query: parsedUrl.query,
       complete: outcome.complete,
-      total,
+      counts,
       itineraries,
       timings: {
         routeLookupMs,

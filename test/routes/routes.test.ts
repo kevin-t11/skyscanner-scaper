@@ -14,7 +14,7 @@ const fakeSearch: FlightSearch = {
   async search(request) {
     received.push(request);
     if (request.searchUrl.includes("blocked")) throw new SessionBlockedError("search API returned 403");
-    return { query: {}, complete: true, total: 0, itineraries: [], timings: {} } as unknown as FlightSearchResult;
+    return { query: {}, complete: true, counts: { received: 0, passed: 0, failed: 0 }, itineraries: [], timings: {} } as unknown as FlightSearchResult;
   },
 };
 const server = createHttpServer(fakeSearch, () => ({ ready: 1 }), { port: 0 });
@@ -33,7 +33,7 @@ describe("/url", () => {
     expect(await response.json()).toMatchObject({
       status: "pass",
       request: { searchUrl: SEARCH_URL, maxItems: 50, sorting: "best" },
-      result: { complete: true, total: 0, count: 0, itineraries: [] },
+      result: { complete: true, counts: { received: 0, passed: 0, failed: 0, returned: 0 }, itineraries: [] },
       failed: {},
     });
   });

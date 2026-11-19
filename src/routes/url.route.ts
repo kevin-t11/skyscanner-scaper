@@ -14,6 +14,7 @@ import { createLogger, formatDuration, type Logger } from "../logging/logger";
 import { saveSearchOutput } from "../output/search-output-writer";
 import type { FlightSearchRequest, FlightSearchResult, SearchTimings } from "../search/flight-search-service";
 import { SORT_ORDERS, type Itinerary, type SortOrder } from "../skyscanner/itinerary";
+import type { ItineraryCounts } from "../skyscanner/itinerary-normalizer";
 import { parseSearchUrl, type FlightSearchQuery } from "../skyscanner/search-url";
 import type { RouteContext } from "./route-context";
 
@@ -83,10 +84,8 @@ export interface SearchRequestSummary {
 export interface SearchResultSummary {
   /** False when the deadline was reached before Skyscanner finished. */
   complete: boolean;
-  /** Priced itineraries Skyscanner returned. */
-  total: number;
-  /** Itineraries in this response (`<= maxItems`). */
-  count: number;
+  /** received = from Skyscanner, passed = parsed and priced, failed = dropped, returned = in this response (`<= maxItems`). */
+  counts: ItineraryCounts & { returned: number };
   query: FlightSearchQuery;
   timings: SearchTimings;
   itineraries: Itinerary[];
@@ -115,8 +114,7 @@ export function passEnvelope(request: FlightSearchRequest, result: FlightSearchR
     request: summarizeRequest(request),
     result: {
       complete: result.complete,
-      total: result.total,
-      count: result.itineraries.length,
+      counts: { ...result.counts, returned: result.itineraries.length },
       query: result.query,
       timings: result.timings,
       itineraries: result.itineraries,
@@ -178,10 +176,10 @@ const describeInput = (input: RawSearchInput) =>
 
 function logOutcome(log: Logger, envelope: SearchEnvelope): void {
   if (envelope.status === "pass" && envelope.result) {
-    const { count, total, complete, itineraries } = envelope.result;
+    const { counts, complete, itineraries } = envelope.result;
     const top = itineraries[0];
     const topLabel = top ? ` · top ${top.priceFormatted || top.price}, ${top.durationMinutes} min` : "";
-    log.info(`pass · ${count}/${total} flights${complete ? "" : " (partial)"}${topLabel} · ${formatDuration(envelope.timeElapsedMs)}`);
+    log.info(`pass · ${counts.returned}/${counts.passed} flights (${counts.failed} failed)${complete ? "" : " (partial)"}${topLabel} · ${formatDuration(envelope.timeElapsedMs)}`);
   } else {
     const failure = envelope.failed as { code?: string; message?: string };
     log.warn(`fail · ${failure.code}: ${failure.message} · ${formatDuration(envelope.timeElapsedMs)}`);

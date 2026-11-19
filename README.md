@@ -121,8 +121,12 @@ lines and output file.
   },
   "result": {                        // null on fail
     "complete": true,                // false when the 12 s deadline was reached first
-    "total": 270,                    // priced itineraries Skyscanner returned
-    "count": 10,                     // itineraries in this response
+    "counts": {                      // how many itineraries...
+      "received": 270,               // ...Skyscanner returned
+      "passed": 270,                 // ...were parsed successfully, with a price
+      "failed": 0,                   // ...were dropped (no price or malformed data)
+      "returned": 10                 // ...are in this response (<= maxItems)
+    },
     "query": { "from": "blr", "to": "del", "dates": ["2026-12-23"], "adults": 1, "childAges": [], "cabinClass": "ECONOMY" },
     "timings": { "routeLookupMs": 412, "searchMs": 7540, "firstResultsMs": 1110, "totalMs": 8110, "upstreamRequests": 5 },
     "itineraries": [{
@@ -174,8 +178,8 @@ Search lines are tagged with the request id and the time since the request arriv
 17:26:10.020 INFO  [req 892d46 +3.25s] poll 2 · found 270 flights (+260) · incomplete
 17:26:10.925 INFO  [req 892d46 +4.15s] poll 3 · found 270 flights (+0) · incomplete
 17:26:14.727 INFO  [req 892d46 +7.95s] poll 5 · found 270 flights (+0) · complete
-17:26:14.880 INFO  [req 892d46 +8.11s] complete · 270 flights in 5 requests · search 7.54s, first results 1.11s
-17:26:14.881 INFO  [req 892d46 +8.11s] pass · 10/270 flights · top ₹9,537, 360 min · 8.11s
+17:26:14.880 INFO  [req 892d46 +8.11s] complete · 270/270 flights parsed in 5 requests · search 7.54s, first results 1.11s
+17:26:14.881 INFO  [req 892d46 +8.11s] pass · 10/270 flights (0 failed) · top ₹9,537, 360 min · 8.11s
 17:26:14.883 INFO  [req 892d46 +8.11s] saved output/20261119-172614_blr-del_cheapest_pass_892d46.json
 ```
 
