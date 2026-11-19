@@ -1,0 +1,45 @@
+import type { ChromeBrowser } from "../browser/chrome-browser";
+
+export type BrowserSessionState = "ready" | "retired";
+
+/**
+ * One warmed browser (one sticky proxy IP) plus its usage counters.
+ * A retired session takes no new work and closes once its in-flight searches end.
+ */
+export class BrowserSession {
+  state: BrowserSessionState = "ready";
+  inflight = 0;
+  /** Requests sent to Skyscanner through this session (lookups + search API calls). */
+  upstreamRequests = 0;
+  readonly startedAt = Date.now();
+  private closing?: Promise<void>;
+
+  constructor(
+    readonly id: string,
+    readonly browser: ChromeBrowser,
+  ) {}
+
+  get isUsable(): boolean {
+    return this.state === "ready" && this.browser.isAlive;
+  }
+
+  /** Runs `work` while counting it as in-flight on this session. */
+  async run<T>(work: (browser: ChromeBrowser) => Promise<T>): Promise<T> {
+    this.inflight++;
+    try {
+      return await work(this.browser);
+    } finally {
+      this.inflight--;
+      if (this.state === "retired" && this.inflight === 0) void this.close();
+    }
+  }
+
+  retire(): void {
+    this.state = "retired";
+    if (this.inflight === 0) void this.close();
+  }
+
+  close(): Promise<void> {
+    return (this.closing ??= this.browser.close().catch(() => undefined));
+  }
+}

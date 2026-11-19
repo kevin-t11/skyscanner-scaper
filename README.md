@@ -91,15 +91,36 @@ Pool state: ready sessions, launches, retirements, and per-session request count
 
 ## How it works
 ```
-/url → parse URL → entity ids (cached) → least-busy session → in-page create + poll → normalize + sort → JSON
+/url → parseSearchRequest → FlightSearchService.search
+         → resolveRoute (entity ids, cached)  → SessionPool.acquire (least-busy warmed Chrome)
+         → runUnifiedSearchInPage (create + poll inside the page) → rankItineraries → SearchEnvelope
 ```
-- `src/url.ts`: search URL → `SearchQuery`.
-- `src/skyscanner.ts`: Skyscanner's request contract and the functions evaluated inside the page.
-- `src/browser.ts`: Chrome over raw CDP. It blocks images, fonts and media, answers proxy auth, and never calls `Runtime.enable`.
-- `src/pool.ts`: warmed sessions. A session is retired on its first block and replaced with a new proxy IP.
-- `src/service.ts`: the `/url` use case, with entity caching and one retry on a fresh session.
-- `src/parse.ts`: normalization and sorting.
-- `src/server.ts`: HTTP validation and error mapping.
+
+```
+src/
+├── main.ts                          entry point: config → pool → HTTP server
+├── errors.ts                        domain errors, mapped to failed.code
+├── config/app-config.ts             AppConfig, loadAppConfig (env)
+├── http/
+│   ├── http-server.ts               routes, API key check, error → envelope mapping
+│   ├── search-request.ts            parseSearchRequest: validates url / max / sort / fast
+│   └── search-envelope.ts           SearchEnvelope, passEnvelope, failEnvelope
+├── search/flight-search-service.ts  FlightSearchService: the /url use case, route cache, retry on block
+├── sessions/
+│   ├── session-pool.ts              SessionPool: warm-up, least-busy acquire, retire + replace, shutdown
+│   └── browser-session.ts           BrowserSession: one Chrome + one proxy IP, in-flight tracking
+├── browser/
+│   ├── chrome-browser.ts            ChromeBrowser: launch, navigate, evaluate, resource blocking, proxy auth
+│   ├── cdp-connection.ts            CdpConnection: typed CDP client over one WebSocket
+│   ├── cdp-protocol.ts              typed CDP commands and events used here
+│   └── proxy-settings.ts            parseProxyUrl, proxyForSession ({session} placeholder)
+└── skyscanner/
+    ├── search-url.ts                parseSearchUrl: /transport/flights/... → FlightSearchQuery
+    ├── unified-search-api.ts        API endpoint, request builders, typed API responses (Api*)
+    ├── page-scripts.ts              lookupRouteEntitiesInPage, runUnifiedSearchInPage (run in the page)
+    ├── itinerary.ts                 public Itinerary / FlightLeg / BookingOption types
+    └── itinerary-normalizer.ts      normalizeItinerary, rankItineraries (best / cheapest / fastest)
+```
 
 ## Development
 ```bash
