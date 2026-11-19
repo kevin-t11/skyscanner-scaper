@@ -64,6 +64,7 @@ PORT=8000
 POOL_SIZE=${POOL_SIZE:-1}
 API_KEY=$API_KEY
 LOGGING=enabled
+CHROME_PATH=$(readlink -f "$(command -v google-chrome)")
 ENV
   chmod 600 "$APP_DIR/.env"
 else
