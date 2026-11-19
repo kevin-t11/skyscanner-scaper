@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 
 PORT="$(sed -nE 's/^PORT=([0-9]+).*/\1/p' .env | tail -1)"
 BASE="http://localhost:${PORT:-8000}"
-KEY="$(sed -nE 's/^API_KEY=([^[:space:]#]*).*/\1/p' .env | tail -1)"
+KEY="$(sed -nE "s/^API_KEY=[\"']?([^\"'[:space:]#]*).*/\1/p" .env | tail -1)"
 SEARCH_URL="${1:-https://www.skyscanner.co.in/transport/flights/bom/blr/$(date -d '+30 days' +%y%m%d)/?adultsv2=1&cabinclass=economy}"
 
 printf 'health  '
