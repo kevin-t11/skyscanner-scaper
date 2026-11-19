@@ -173,7 +173,8 @@ export class FlightSearchService implements FlightSearch {
   /** Place codes and names map to the same entities forever, so routes are cached by input text. */
   private async resolveRoute(session: BrowserSession, request: FlightSearchRequest, log: Logger): Promise<ResolvedRoute> {
     const { query, pathAndQuery } = request;
-    const cacheKey = `${query.from}|${query.to}`.toLowerCase();
+    // Case matters (`GOA` is Genoa's code, `goa` is Goa) and URL codes match differently from free text.
+    const cacheKey = `${pathAndQuery === undefined ? "text" : "url"}|${query.from}|${query.to}`;
     const cached = this.routeCache.get(cacheKey);
     if (cached) {
       log.info(`route ${query.from}→${query.to} cached`);
