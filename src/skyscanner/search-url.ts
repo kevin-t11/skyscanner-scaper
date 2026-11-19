@@ -34,7 +34,11 @@ const MAX_PASSENGERS_PER_TYPE = 8;
 function parseDateSegment(yymmdd: string): string {
   if (!/^\d{6}$/.test(yymmdd)) throw new InvalidSearchUrlError(`bad date segment: ${yymmdd}`);
   const iso = `20${yymmdd.slice(0, 2)}-${yymmdd.slice(2, 4)}-${yymmdd.slice(4, 6)}`;
-  if (Number.isNaN(Date.parse(iso))) throw new InvalidSearchUrlError(`bad date: ${yymmdd}`);
+  // Date.parse rolls impossible dates over (2027-02-29 → 2027-03-01); require an exact round trip.
+  const parsed = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== iso) {
+    throw new InvalidSearchUrlError(`bad date: ${yymmdd}`);
+  }
   return iso;
 }
 

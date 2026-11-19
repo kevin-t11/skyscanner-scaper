@@ -23,6 +23,8 @@ describe("parseSearchUrl", () => {
     "https://example.com/transport/flights/lhr/jfk/261215/",
     "https://www.skyscanner.com/hotels/london",
     "https://www.skyscanner.com/transport/flights/lhr/jfk/2612/",
+    "https://www.skyscanner.com/transport/flights/lhr/jfk/270229/",
+    "https://www.skyscanner.com/transport/flights/lhr/jfk/261331/",
   ])("rejects %s", (url) => {
     expect(() => parseSearchUrl(url)).toThrow(InvalidSearchUrlError);
   });
