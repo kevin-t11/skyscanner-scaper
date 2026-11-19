@@ -66,6 +66,10 @@ export class CdpConnection {
     set.add(listener as EventListener<CdpEvent>);
   }
 
+  get isClosed(): boolean {
+    return this.closed;
+  }
+
   close(): void {
     if (!this.closed) this.socket.close();
     this.rejectPending(new BrowserError("CDP connection closed"));

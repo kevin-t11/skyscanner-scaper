@@ -73,8 +73,8 @@ export class FlightSearchService implements FlightSearch {
       try {
         return await session.run(() => this.searchOnSession(session, parsedUrl, request, startedAt));
       } catch (error) {
-        // A block, or the browser going away underneath us (crash or retirement), is retried on a fresh session.
-        const retryable = error instanceof SessionBlockedError || (error instanceof BrowserError && !session.isUsable);
+        // A block or any browser failure (crash, lost CDP connection, retirement) is retried on a fresh session.
+        const retryable = error instanceof SessionBlockedError || error instanceof BrowserError;
         if (!retryable) throw error;
         this.pool.retire(session, (error as Error).message);
         if (attempt >= MAX_ATTEMPTS) {

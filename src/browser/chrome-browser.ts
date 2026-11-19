@@ -52,10 +52,10 @@ export class ChromeBrowser {
     }
   }
 
+  /** False once Chrome exits or its DevTools connection drops. */
   get isAlive(): boolean {
-    return this.process.exitCode === null && !this.process.killed;
+    return this.process.exitCode === null && !this.process.killed && !this.cdp.isClosed;
   }
-
   /** Navigates, waits for `load`, then gives in-page scripts `settleMs` to run. Returns the final URL. */
   async navigate(url: string, timeoutMs = 30_000, settleMs = 1_500): Promise<string> {
     const { errorText } = await this.sendToPage("Page.navigate", { url });
