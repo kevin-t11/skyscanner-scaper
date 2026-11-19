@@ -94,19 +94,19 @@ All search endpoints return the same envelope; `x-api-key` is required on `/sear
 ### `POST /search` (main endpoint)
 ```bash
 curl localhost:8000/search -H 'content-type: application/json' \
-  -d '{"from":"Mumbai","to":"Goa","departDate":"2026-12-15","returnDate":"2026-12-22","cabinClass":"economy","adults":1,"max":10,"sort":"cheapest"}'
+  -d '{"from":"BOM","to":"GOI","departDate":"2026-12-15","returnDate":"2026-12-22","cabinClass":"economy","adults":1,"max":10,"sort":"cheapest"}'
 ```
 | Field | Default | Meaning |
 |---|---|---|
-| `from`, `to` | required | City or airport name or code. A capitalized code matches exactly (`BOM` = Mumbai airport, `NYCA` = New York, all airports); other text takes the top autocomplete match (`mumbai`, `goa`, `new york`) |
+| `from`, `to` | required | Skyscanner place code, any case: airport (`BOM`, `JFK`) or city with all its airports (`NYCA`, `LOND`, `DXBA`). Find codes with `GET /places` |
 | `departDate` | required | `YYYY-MM-DD` |
 | `returnDate` | none | `YYYY-MM-DD`; omit for one-way |
 | `cabinClass` | `economy` | `economy`, `premium_economy`, `business`, `first` |
 | `adults` | `1` | 1–8 |
 | `max`, `sort` | `50`, `best` | As for `/url` |
 
-The result also has `places` (what `from` / `to` resolved to) and `searchUrl` (the same search on the website).
-Unknown places return `400 invalid_request: no airport or city matches "…"`.
+`request.searchUrl` (also on failures) and `result.searchUrl` are the same search on the website, to verify results.
+`result.places` shows what each code resolved to.
 
 ### `GET /places?q=mumb&type=from`
 Autocomplete for the From (`type=from`, default) or To (`type=to`) box:
@@ -115,7 +115,7 @@ Autocomplete for the From (`type=from`, default) or To (`type=to`) box:
   {"name":"Mumbai","code":"IBOM","iata":"BOM","type":"city","entityId":"27539520","city":"Mumbai","country":"India"},
   {"name":"Mumbai","code":"BOM","iata":"BOM","type":"airport","entityId":"95673320","city":"Mumbai","country":"India"}]}
 ```
-Pass a place's `code` as `from` / `to` in `/search` to pick it exactly.
+Use a place's `code` as `from` / `to` in `/search`.
 
 ### `POST /url`
 Send a JSON body. `GET /url` returns 405.

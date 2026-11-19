@@ -1,11 +1,12 @@
 /**
  * `POST /search`: a flight search from explicit fields instead of a Skyscanner URL.
- *   { "from": "Mumbai", "to": "BOM", "departDate": "2026-12-15", "returnDate": "2026-12-22",
+ *   { "from": "BOM", "to": "NYCA", "departDate": "2026-12-15", "returnDate": "2026-12-22",
  *     "cabinClass": "economy", "adults": 1, "max": 50, "sort": "best" }
- * `from` / `to` are city or airport names or codes, resolved with Skyscanner's autocomplete.
- * Same response envelope as `/url`.
+ * `from` / `to` are Skyscanner place codes (airport `BOM`, city `NYCA`); find them with `GET /places`.
+ * Same response envelope as `/url`; `request.searchUrl` is the same search on the website.
  */
-import type { CabinClass } from "../parsers/search-url";
+import { SKYSCANNER_SITE } from "../config/app-config";
+import { buildSearchPath, type CabinClass } from "../parsers/search-url";
 import type { RouteContext } from "./route-context";
 import {
   createFlightSearchRoute,
@@ -25,14 +26,15 @@ const CABIN_CLASSES: Record<string, CabinClass> = {
   first: "FIRST",
 };
 const MAX_ADULTS = 8;
-const MAX_PLACE_LENGTH = 100;
+const PLACE_CODE = /^[A-Za-z]{3,4}$/;
 const DAY_MS = 86_400_000;
 
 function placeField(input: RawSearchInput, field: "from" | "to"): string {
-  const value = input[field];
-  if (typeof value !== "string" || !value.trim()) throw new InvalidRequestError(`\`${field}\` is required (city or airport name or code)`);
-  if (value.length > MAX_PLACE_LENGTH) throw new InvalidRequestError(`\`${field}\` is longer than ${MAX_PLACE_LENGTH} characters`);
-  return value.trim();
+  const value = typeof input[field] === "string" ? (input[field] as string).trim() : "";
+  if (!PLACE_CODE.test(value)) {
+    throw new InvalidRequestError(`\`${field}\` must be a Skyscanner place code (3-4 letters, e.g. BOM, NYCA); find codes with GET /places?q=`);
+  }
+  return value.toUpperCase();
 }
 
 function dateField(input: RawSearchInput, field: "departDate" | "returnDate"): string {
@@ -62,10 +64,14 @@ function parseFieldsRequest(input: RawSearchInput): ParsedSearchRequest {
   const adults = input.adults === undefined || input.adults === "" ? 1 : Number(input.adults);
   if (!Number.isInteger(adults) || adults < 1 || adults > MAX_ADULTS) throw new InvalidRequestError(`\`adults\` must be an integer 1..${MAX_ADULTS}`);
 
+  if (from === to) throw new InvalidRequestError("`from` and `to` must differ");
+
   const options = parseListOptions(input);
+  const query = { from, to, dates: returnDate ? [departDate, returnDate] : [departDate], adults, childAges: [], cabinClass };
+  const pathAndQuery = buildSearchPath(query, { from: null, to: null });
   return {
-    request: { query: { from, to, dates: returnDate ? [departDate, returnDate] : [departDate], adults, childAges: [], cabinClass }, ...options },
-    summary: { from, to, departDate, returnDate, cabinClass: cabinName as string, adults, maxItems: options.maxItems, sorting: options.sort },
+    request: { query, pathAndQuery, ...options },
+    summary: { searchUrl: `https://${SKYSCANNER_SITE.host}${pathAndQuery}`, from, to, departDate, returnDate, cabinClass: cabinName as string, adults, maxItems: options.maxItems, sorting: options.sort },
   };
 }
 

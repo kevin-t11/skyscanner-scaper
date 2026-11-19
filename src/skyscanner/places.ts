@@ -91,18 +91,8 @@ export function normalizePlaces(raw: RawPlace[]): Place[] {
   });
 }
 
-/**
- * The suggestion for `text`. A code matches exactly: place code first (`BOM` → the airport,
- * `NYCA` → New York), then IATA (`NYC` → New York, all airports).
- *   exactOnly (URL codes):  only an exact code match.
- *   otherwise (free text):  a capitalized code (`GOA`, `BOM`) only matches exactly (none → the
- *                           caller's search-page fallback); any other text takes the top
- *                           suggestion, so `goa` is Goa, India, not Genoa (GOA).
- */
-export function pickPlace(places: Place[], text: string, exactOnly = false): Place | undefined {
-  const trimmed = text.trim();
-  const wanted = trimmed.toUpperCase();
-  const exact = () => places.find((place) => place.code.toUpperCase() === wanted) ?? places.find((place) => place.iata === wanted);
-  if (exactOnly) return exact();
-  return /^[A-Z]{3,4}$/.test(trimmed) ? exact() : places[0];
+/** The suggestion with exactly this code: place code first (`BOM`, `NYCA`), then IATA (`NYC` → New York). */
+export function pickPlace(places: Place[], code: string): Place | undefined {
+  const wanted = code.trim().toUpperCase();
+  return places.find((place) => place.code.toUpperCase() === wanted) ?? places.find((place) => place.iata === wanted);
 }

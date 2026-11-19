@@ -9,7 +9,7 @@ import { rankItineraries, type ItineraryCounts } from "../parsers/itinerary-norm
 import { lookupRouteEntitiesInPage, toPageExpression, type RouteLookupResult } from "../skyscanner/page-scripts";
 import { isChallengeUrl, solvePressAndHold } from "../skyscanner/px-challenge";
 import { autosuggestInPage, normalizePlaces, pickPlace, type AutosuggestResult, type Place } from "../skyscanner/places";
-import { buildSearchPath, buildSearchUrl, type FlightSearchQuery } from "../parsers/search-url";
+import { buildSearchUrl, type FlightSearchQuery } from "../parsers/search-url";
 import {
   buildUnifiedSearchBody,
   buildUnifiedSearchHeaders,
@@ -19,12 +19,12 @@ import {
 import { runUnifiedSearch, type UnifiedSearchOutcome } from "../skyscanner/unified-search-runner";
 
 export interface FlightSearchRequest {
-  /** `from` / `to` are place codes (`/url`) or free text (`/search`). */
+  /** `from` / `to` are Skyscanner place codes. */
   query: FlightSearchQuery;
   maxItems: number;
   sort: SortOrder;
-  /** `/url` only: places must match the URL's codes exactly; the search page is the fallback. */
-  pathAndQuery?: string;
+  /** The website search, fetched when autocomplete does not know a code exactly (e.g. `DXBA`). */
+  pathAndQuery: string;
 }
 
 /** What `from` / `to` resolved to; `null` when only the search-page fallback knew the code. */
@@ -72,8 +72,6 @@ const REQUEST_TIMEOUT_MS = 6_000;
 const STABLE_POLLS = 1;
 const ROUTE_LOOKUP_TIMEOUT_MS = 10_000;
 const PLACES_TIMEOUT_MS = 5_000;
-/** A Skyscanner place code as a caller would type it: `BOM`, `NYCA`. */
-const PLACE_CODE = /^[A-Z]{3,4}$/;
 const ROUTE_CACHE_LIMIT = 10_000;
 /** One retry on a fresh session after a block; more mostly burns proxy bandwidth. */
 const MAX_ATTEMPTS = 2;
@@ -170,11 +168,10 @@ export class FlightSearchService implements FlightSearch {
     };
   }
 
-  /** Place codes and names map to the same entities forever, so routes are cached by input text. */
+  /** Place codes map to the same entities forever, so routes are cached by code. */
   private async resolveRoute(session: BrowserSession, request: FlightSearchRequest, log: Logger): Promise<ResolvedRoute> {
     const { query, pathAndQuery } = request;
-    // Case matters (`GOA` is Genoa's code, `goa` is Goa) and URL codes match differently from free text.
-    const cacheKey = `${pathAndQuery === undefined ? "text" : "url"}|${query.from}|${query.to}`;
+    const cacheKey = `${query.from}|${query.to}`.toUpperCase();
     const cached = this.routeCache.get(cacheKey);
     if (cached) {
       log.info(`route ${query.from}→${query.to} cached`);
@@ -182,11 +179,9 @@ export class FlightSearchService implements FlightSearch {
     }
     const lookupStartedAt = performance.now();
 
-    // A URL holds exact place codes; free text (`/search`) takes the top suggestion.
-    const exactOnly = pathAndQuery !== undefined;
     const [from, to] = await Promise.all([
-      this.placesOnSession(session, query.from, false).then((places) => pickPlace(places, query.from, exactOnly)),
-      this.placesOnSession(session, query.to, true).then((places) => pickPlace(places, query.to, exactOnly)),
+      this.placesOnSession(session, query.from, false).then((places) => pickPlace(places, query.from)),
+      this.placesOnSession(session, query.to, true).then((places) => pickPlace(places, query.to)),
     ]);
 
     let resolved: ResolvedRoute;
@@ -200,12 +195,9 @@ export class FlightSearchService implements FlightSearch {
         },
         places: { from, to },
       };
-    } else if (pathAndQuery || [from ? null : query.from, to ? null : query.to].every((text) => text === null || PLACE_CODE.test(text))) {
-      // Codes autocomplete does not return (e.g. `NYCA`, `DXBA`): the search page knows them.
-      const path = pathAndQuery ?? buildSearchPath(query, { from: from ?? null, to: to ?? null });
-      resolved = { route: await this.lookupRouteFromPage(session, path, query), places: { from: from ?? null, to: to ?? null } };
     } else {
-      throw new PlaceNotFoundError(`no airport or city matches "${from ? query.to : query.from}"`);
+      // Codes autocomplete does not return exactly (e.g. `NYCA`, `DXBA`): the search page knows them.
+      resolved = { route: await this.lookupRouteFromPage(session, pathAndQuery, query), places: { from: from ?? null, to: to ?? null } };
     }
 
     if (this.routeCache.size >= ROUTE_CACHE_LIMIT) this.routeCache.clear();
