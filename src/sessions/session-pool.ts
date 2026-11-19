@@ -71,17 +71,18 @@ export class SessionPool {
 
   /**
    * Runs `work` with the session's page to itself: only when no search is using it, and no new
-   * search gets it until `work` ends. Returns false when the session is busy or `work` fails.
+   * search gets it until `work` ends. Returns false when the session is busy or `work` fails; then the caller must retire it.
    */
   async runExclusive(session: BrowserSession, work: (browser: ChromeBrowser) => Promise<boolean>): Promise<boolean> {
     if (!session.isUsable || session.inflight > 0) return false;
     session.state = "exclusive";
-    try {
-      return await session.run(work).catch(() => false);
-    } finally {
-      if (session.state === "exclusive") session.state = "ready";
+    const succeeded = await session.run(work).catch(() => false);
+    // On failure the session stays out of rotation; the caller retires it.
+    if (succeeded && session.state === "exclusive") {
+      session.state = "ready";
       this.notifyReady();
     }
+    return succeeded;
   }
 
   /** Retires a session and launches a replacement with a new proxy IP. */
