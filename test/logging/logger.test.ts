@@ -1,7 +1,30 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
-import { createLogger, formatDuration, setLogLevel } from "../../src/logging/logger";
+import { createLogger, formatDuration, parseLoggingEnabled, setLoggingEnabled, setLogLevel } from "../../src/logging/logger";
 
-afterEach(() => setLogLevel("info"));
+afterEach(() => {
+  setLogLevel("info");
+  setLoggingEnabled(true);
+});
+
+test("LOGGING=disabled turns every log line off", () => {
+  const output = spyOn(console, "log").mockImplementation(() => {});
+  const errors = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    setLoggingEnabled(false);
+    createLogger("pool").info("hidden");
+    createLogger("pool").error("hidden too");
+    expect(output).not.toHaveBeenCalled();
+    expect(errors).not.toHaveBeenCalled();
+  } finally {
+    output.mockRestore();
+    errors.mockRestore();
+  }
+});
+
+test("parseLoggingEnabled", () => {
+  expect([undefined, "", "enabled", "true"].map(parseLoggingEnabled)).toEqual([true, true, true, true]);
+  expect(["disabled", "DISABLED", "false", "off", "0"].map(parseLoggingEnabled)).toEqual([false, false, false, false, false]);
+});
 
 test("formats compact lines with scope and elapsed time", () => {
   const output = spyOn(console, "log").mockImplementation(() => {});

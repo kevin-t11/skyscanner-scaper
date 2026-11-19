@@ -9,10 +9,19 @@ const LEVEL_RANK: Record<LogLevel, number> = { debug: 10, info: 20, warn: 30, er
 export const parseLogLevel = (value: string | undefined): LogLevel =>
   value && value in LEVEL_RANK ? (value as LogLevel) : "info";
 
+/** `LOGGING=disabled` (or `false` / `off` / `0`) turns all logs off; anything else, or unset, keeps them on. */
+export const parseLoggingEnabled = (value: string | undefined): boolean =>
+  !["disabled", "false", "off", "0"].includes((value ?? "").trim().toLowerCase());
+
 let minimumLevel: LogLevel = parseLogLevel(process.env.LOG_LEVEL);
+let loggingEnabled = parseLoggingEnabled(process.env.LOGGING);
 
 export function setLogLevel(level: LogLevel): void {
   minimumLevel = level;
+}
+
+export function setLoggingEnabled(enabled: boolean): void {
+  loggingEnabled = enabled;
 }
 
 export interface Logger {
@@ -36,7 +45,7 @@ export function createLogger(scope: string, options: { timed?: boolean } = {}): 
   const elapsedMs = () => Math.round(performance.now() - startedAt);
 
   const write = (level: LogLevel, message: string) => {
-    if (LEVEL_RANK[level] < LEVEL_RANK[minimumLevel]) return;
+    if (!loggingEnabled || LEVEL_RANK[level] < LEVEL_RANK[minimumLevel]) return;
     const elapsed = options.timed ? ` +${(elapsedMs() / 1000).toFixed(2)}s` : "";
     const line = `${clockTime(new Date())} ${level.toUpperCase().padEnd(5)} [${scope}${elapsed}] ${escapeControlCharacters(message)}`;
     (level === "error" || level === "warn" ? console.error : console.log)(line);

@@ -1,11 +1,12 @@
 /** Entry point: load config, start the browser pool and the HTTP server. */
 import { loadAppConfig } from "./config/app-config";
 import { createHttpServer } from "./http/http-server";
-import { createLogger, setLogLevel } from "./logging/logger";
+import { createLogger, setLoggingEnabled, setLogLevel } from "./logging/logger";
 import { FlightSearchService } from "./search/flight-search-service";
 import { SessionPool } from "./sessions/session-pool";
 
 const config = loadAppConfig();
+setLoggingEnabled(config.loggingEnabled);
 setLogLevel(config.logLevel);
 const log = createLogger("server");
 

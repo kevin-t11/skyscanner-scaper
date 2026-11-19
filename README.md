@@ -94,7 +94,8 @@ Set these in `.env` (Bun loads it automatically) or in the environment.
 | `HOST` | `127.0.0.1` | Listen address; use `0.0.0.0` only together with `API_KEY` |
 | `API_KEY` | none | When set, `/url` requires the `x-api-key` header |
 | `OUTPUT_DIR` | `output` | Where every search response is saved as JSON; set it empty (`OUTPUT_DIR=`) to turn saving off |
-| `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
+| `LOGGING` | `enabled` | `enabled` prints the server logs; `disabled` turns them all off |
+| `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` (when `LOGGING` is enabled) |
 
 ## API
 
@@ -201,7 +202,8 @@ Search lines are tagged with the request id and the time since the request arriv
 | `pass` / `fail` | What the response contained |
 | `[pool] session … retired` | A session was blocked or broke and is being replaced with a new IP |
 
-To keep logs in a file: `bun start 2>&1 | tee -a logs/server.log`.
+To keep logs in a file: `bun start 2>&1 | tee -a logs/server.log`. To turn logs off: `LOGGING=disabled`.
+Output files are still saved when logging is off; they are controlled by `OUTPUT_DIR`.
 
 ## Output files
 Every `/url` search response is saved to `OUTPUT_DIR` (default `output/`, which git ignores), named

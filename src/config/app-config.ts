@@ -1,5 +1,5 @@
 /** Runtime configuration, read once from the environment. */
-import { parseLogLevel, type LogLevel } from "../logging/logger";
+import { parseLoggingEnabled, parseLogLevel, type LogLevel } from "../logging/logger";
 
 export interface AppConfig {
   port: number;
@@ -22,6 +22,8 @@ export interface AppConfig {
   searchDeadlineMs: number;
   /** Where each `/url` response is saved as JSON; `undefined` disables saving. */
   outputDir: string | undefined;
+  /** `LOGGING=enabled|disabled`; default enabled. */
+  loggingEnabled: boolean;
   logLevel: LogLevel;
 }
 
@@ -48,6 +50,7 @@ export function loadAppConfig(env: Env = process.env): AppConfig {
     searchDeadlineMs: positiveInt(env.SEARCH_DEADLINE_MS, 12_000),
     // Unset → ./output; set to an empty string to disable saving.
     outputDir: env.OUTPUT_DIR === undefined ? "output" : env.OUTPUT_DIR || undefined,
+    loggingEnabled: parseLoggingEnabled(env.LOGGING),
     logLevel: parseLogLevel(env.LOG_LEVEL),
   };
 }
