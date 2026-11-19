@@ -6,6 +6,9 @@ export class InvalidSearchUrlError extends Error {}
 /** No warmed browser session became ready in time. */
 export class NoSessionAvailableError extends Error {}
 
+/** No airport or city matches the caller's `from` / `to`. */
+export class PlaceNotFoundError extends Error {}
+
 /** PerimeterX rejected the browser session (HTTP 403 or a captcha redirect). */
 export class SessionBlockedError extends Error {
   constructor(

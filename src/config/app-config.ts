@@ -4,11 +4,11 @@
  * everything else is a fixed setting below.
  */
 import { existsSync } from "node:fs";
-import { parseLoggingEnabled } from "../logging/logger";
+import { parseLoggingEnabled } from "../utils/logger";
 import { readDotEnv } from "./dotenv";
 
 /** Skyscanner site and market every session uses; results are priced in this currency. */
-const SKYSCANNER_SITE = { host: "www.skyscanner.co.in", market: "IN", locale: "en-GB", currency: "INR" } as const;
+export const SKYSCANNER_SITE = { host: "www.skyscanner.co.in", market: "IN", locale: "en-GB", currency: "INR" } as const;
 
 /** Upper bound for one search, including all polls; partial results are returned after it. */
 const SEARCH_DEADLINE_MS = 12_000;

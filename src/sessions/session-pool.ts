@@ -7,7 +7,7 @@ import { ChromeBrowser } from "../browser/chrome-browser";
 import { proxyForSession } from "../browser/proxy-settings";
 import type { AppConfig } from "../config/app-config";
 import { NoSessionAvailableError } from "../errors";
-import { createLogger, formatDuration } from "../logging/logger";
+import { createLogger, formatDuration } from "../utils/logger";
 import { isChallengeUrl, solvePressAndHold } from "../skyscanner/px-challenge";
 import { BrowserSession } from "./browser-session";
 

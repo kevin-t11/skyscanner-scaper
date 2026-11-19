@@ -1,7 +1,7 @@
 /** Turns raw `web-unified-search` itineraries into `Itinerary` objects and ranks them. */
-import type { UnifiedSearchPayload } from "./page-scripts";
-import type { ApiItinerary, ApiLeg, ApiPlace, ApiPricingOption } from "./unified-search-api";
-import type { BookingOption, FlightLeg, Itinerary, Place, SortOrder } from "./itinerary";
+import type { UnifiedSearchPayload } from "../skyscanner/page-scripts";
+import type { ApiItinerary, ApiLeg, ApiPlace, ApiPricingOption } from "../skyscanner/unified-search-api";
+import type { BookingOption, FlightLeg, Itinerary, Place, SortOrder } from "../types/itinerary";
 
 const MAX_BOOKING_OPTIONS = 5;
 

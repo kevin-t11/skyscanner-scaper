@@ -98,7 +98,8 @@ export async function runUnifiedSearch(
     sessionId = result.sessionId ?? sessionId;
     const newResults = result.resultCount - resultCount;
     resultCount = result.resultCount;
-    unchangedPolls = upstreamRequests > 1 && newResults === 0 ? unchangedPolls + 1 : 0;
+    // The first poll often adds nothing while agents are still being queried; count from the second.
+    unchangedPolls = upstreamRequests > 2 && newResults === 0 ? unchangedPolls + 1 : 0;
     if (firstResultsMs === null && resultCount > 0) firstResultsMs = elapsedMs();
     if (httpStatus === 200 && !result.failure) {
       onProgress?.({ step: upstreamRequests, status, resultCount, newResults, elapsedMs: elapsedMs() });
