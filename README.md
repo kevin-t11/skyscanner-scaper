@@ -156,7 +156,19 @@ lines and output file.
 | 500 | `internal_error` | Unexpected error (details in the server log) |
 
 ### `GET /health`
-Pool state: ready and warming sessions, launches, retirements, and requests made by each session.
+Same shape as the Zillow scraper's: HTTP 200 while at least one browser is ready, 503 otherwise.
+
+```json
+{
+  "status": "ok",                  // ok | warming | no-browsers
+  "size": 1, "live": 1, "warming": 0,
+  "launched": 1, "retired": 0, "launch_errors": 0,
+  "last_error": null,              // last launch failure or retirement reason
+  "oldest_session_age_s": 312.4,
+  "last_success_at": "2026-11-19T15:20:41.512Z",
+  "proxy": true
+}
+```
 
 ## Logs
 The server prints one compact line per step to stdout (warnings and errors go to stderr):
@@ -219,10 +231,11 @@ On the server, from a clone of this repository:
 ```bash
 bash deploy/install.sh     # 1st run: installs xvfb, Chrome, Bun and creates .env (generated API_KEY)
 nano .env                  # set PROXY_URL and POOL_SIZE
-bash deploy/install.sh     # runs the tests, installs and starts the `skyscanner` service
+bash deploy/install.sh     # installs and starts the `skyscanner` service
+bash deploy/check.sh       # health + one live search
 ```
 
-Updates: `git pull && bash deploy/install.sh`. Full guide (rollback, verification, operations): [DEPLOYMENT.md](DEPLOYMENT.md).
+Updates: `git pull && bash deploy/install.sh && bash deploy/check.sh`. Full guide (rollback, verification, operations): [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Troubleshooting
 | Symptom | Fix |
@@ -296,7 +309,8 @@ What each folder and file is for, in the order a `/url` request passes through t
 | `tsconfig.json` | TypeScript settings (strict mode) |
 | `.env.example` | Every setting with a comment; copy it to `.env` (the only place settings are read from) |
 | `DEPLOYMENT.md` | Lightsail deployment: first install, update, rollback, verification, operations |
-| `deploy/install.sh` | Installs xvfb, Chrome and Bun, creates `.env` on the first run, runs the tests, installs and restarts the `skyscanner` service |
+| `deploy/install.sh` | Installs xvfb, Chrome and Bun, creates `.env` on the first run, installs and restarts the `skyscanner` service |
+| `deploy/check.sh` | After a deploy: waits for a ready browser, then runs one live search and prints pass/fail |
 | `deploy/skyscanner.service` | systemd unit template used by `install.sh` |
 | `.gitignore` | Keeps `.env`, `node_modules/`, HAR captures and `/output/` out of git |
 | `README.md` | This guide |

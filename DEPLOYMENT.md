@@ -17,7 +17,8 @@ git clone https://github.com/kevin-t11/skyscanner-scaper.git ~/skyscanner-scaper
 cd ~/skyscanner-scaper
 bash deploy/install.sh     # installs xvfb, Chrome, Bun; creates .env with a generated API_KEY; stops
 nano .env                  # set PROXY_URL and POOL_SIZE
-bash deploy/install.sh     # runs the tests, installs and starts the service, waits for a ready browser
+bash deploy/install.sh     # installs and starts the service
+bash deploy/check.sh       # waits for a ready browser, then runs one live search
 ```
 
 Evomi `PROXY_URL` (keep `{session}` so each browser gets its own sticky IP):
@@ -32,9 +33,8 @@ PROXY_URL=core-residential.evomi.com:1000:USER:PASS_country-IN_session-{session}
 cd ~/skyscanner-scaper
 git pull
 bash deploy/install.sh
+bash deploy/check.sh
 ```
-
-The script stops before restarting if the tests fail, so a broken commit never replaces the running version.
 
 ## Roll back
 
@@ -50,13 +50,12 @@ Return to the latest version with `git checkout main && git pull && bash deploy/
 ## Verify
 
 ```bash
-curl http://<LIGHTSAIL_IP>/health          # "ready": 1 or more
-KEY=$(sed -nE 's/^API_KEY=([^ #]*).*/\1/p' ~/skyscanner-scaper/.env)
-curl http://<LIGHTSAIL_IP>/url -H "x-api-key: $KEY" -H 'content-type: application/json' \
-  -d '{"url":"https://www.skyscanner.co.in/transport/flights/bom/blr/261226/?adultsv2=1&cabinclass=economy","max":5,"sort":"cheapest"}'
+bash deploy/check.sh                       # on the server: health + one live search with the API_KEY from .env
+curl http://<LIGHTSAIL_IP>/health          # from outside, through Caddy
 ```
 
-Check `"status":"pass"` and `result.counts`, not only the HTTP status.
+`deploy/check.sh` prints one line per step, e.g. `search  pass · 164 flights · cheapest ₹6,254 · 4720 ms`.
+Pass a Skyscanner URL to test a specific route: `bash deploy/check.sh '<search url>'`.
 
 ## Operations
 
@@ -68,6 +67,6 @@ Check `"status":"pass"` and `result.counts`, not only the HTTP status.
 
 | Symptom | Check |
 |---|---|
-| `/health` shows `"ready":0` and `launchErrors` growing | `journalctl -u skyscanner -n 50`: usually `PROXY_URL` (wrong credentials or format) |
+| `/health` returns 503 with `"live":0` and `launch_errors` growing (see `last_error`) | `journalctl -u skyscanner -n 50`: usually `PROXY_URL` (wrong credentials or format) |
 | `502` from Caddy | Service down: `systemctl status skyscanner` |
 | Timeout from outside | Port 80 not open in the Lightsail firewall |
