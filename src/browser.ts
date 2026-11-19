@@ -68,8 +68,9 @@ export class Browser {
       "about:blank",
     ].filter(Boolean);
 
-    const proc = Bun.spawn([options.chromePath, ...args], { stdout: "ignore", stderr: "pipe" });
+    let proc: Subprocess | undefined;
     try {
+      proc = Bun.spawn([options.chromePath, ...args], { stdout: "ignore", stderr: "pipe" });
       const wsUrl = await readDevToolsUrl(proc, 15_000);
       const cdp = await CdpConnection.connect(wsUrl);
       const sessionId = await attachToPage(cdp);
@@ -77,7 +78,7 @@ export class Browser {
       await browser.configure(options);
       return browser;
     } catch (error) {
-      proc.kill();
+      proc?.kill();
       await rm(profileDir, { recursive: true, force: true });
       throw error;
     }
@@ -85,7 +86,8 @@ export class Browser {
 
   /** Navigates and waits for `load`, then gives in-page scripts `settleMs` to run. */
   async goto(url: string, timeoutMs = 30_000, settleMs = 1_500): Promise<string> {
-    await this.send("Page.navigate", { url });
+    const { errorText } = await this.send("Page.navigate", { url });
+    if (errorText) throw new CdpError(`navigation to ${url} failed: ${errorText}`);
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       const state = await this.evaluate<string>("document.readyState").catch(() => "loading");
