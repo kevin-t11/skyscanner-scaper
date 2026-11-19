@@ -81,6 +81,13 @@ test("reports invalid JSON in a 200 response as malformed, not a network failure
   expect(outcome).toMatchObject({ httpStatus: 200, failure: "malformed", complete: false, resultCount: 0, upstreamRequests: 1 });
 });
 
+test("a connection drop while reading a 200 body is a network failure", async () => {
+  const brokenBody = new ReadableStream({ pull: (controller) => controller.error(new TypeError("network error")) });
+  globalThis.fetch = (async () => new Response(brokenBody, { status: 200 })) as unknown as typeof fetch;
+  const outcome = await runUnifiedSearchInPage(searchArgs());
+  expect(outcome).toMatchObject({ httpStatus: 0, failure: "network", resultCount: 0 });
+});
+
 describe("lookupRouteEntitiesInPage", () => {
   test("extracts entity ids from the server-rendered search page", async () => {
     const html = `"legs":[{"originEntityId":"95565050","destinationEntityId":"95565058"}],"destination":{"entityId":"95565058","id":"JFK","geoContainerId":"27537542"}`;

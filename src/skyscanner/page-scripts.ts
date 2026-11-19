@@ -99,21 +99,22 @@ export async function runUnifiedSearchInPage(args: UnifiedSearchArgs): Promise<U
 
   const request = async (url: string, init: RequestInit): Promise<number> => {
     upstreamRequests++;
-    let response: Response;
-    let data: UnifiedSearchResponse;
+    // Reading the body is part of the transfer: a drop there is a network failure, not bad JSON.
+    let body: string;
     try {
-      response = await fetch(url, { ...init, credentials: "include", headers: args.headers, signal: deadline.signal });
+      const response = await fetch(url, { ...init, credentials: "include", headers: args.headers, signal: deadline.signal });
       if (response.status !== 200) return response.status;
+      body = await response.text();
     } catch {
       if (deadline.signal.aborted) timedOut = true;
       else failure = "network";
       return deadline.signal.aborted ? 200 : 0;
     }
+    let data: UnifiedSearchResponse;
     try {
-      data = await response.json();
+      data = JSON.parse(body);
     } catch {
-      if (deadline.signal.aborted) timedOut = true;
-      else failure = "malformed";
+      failure = "malformed";
       return 200;
     }
     context = data.context ?? {};
