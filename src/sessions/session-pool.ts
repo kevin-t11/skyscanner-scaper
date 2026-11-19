@@ -7,10 +7,12 @@ import { ChromeBrowser } from "../browser/chrome-browser";
 import { proxyForSession } from "../browser/proxy-settings";
 import type { AppConfig } from "../config/app-config";
 import { NoSessionAvailableError } from "../errors";
+import { createLogger, formatDuration } from "../logging/logger";
 import { BrowserSession } from "./browser-session";
 
 const LAUNCH_RETRY_BACKOFF_MS = [1_000, 5_000, 15_000, 60_000];
 const DEFAULT_ACQUIRE_TIMEOUT_MS = 30_000;
+const log = createLogger("pool");
 
 export interface PoolHealth {
   ready: number;
@@ -71,7 +73,7 @@ export class SessionPool {
     if (!this.sessions.delete(session)) return;
     session.retire();
     this.counters.retired++;
-    console.warn(`[pool] retired ${session.id} after ${session.upstreamRequests} requests: ${reason}`);
+    log.warn(`session ${session.id} retired after ${session.upstreamRequests} requests: ${reason}`);
     if (!this.stopped) this.launchInBackground();
   }
 
@@ -105,8 +107,10 @@ export class SessionPool {
     if (this.stopped) return;
 
     let browser: ChromeBrowser | undefined;
+    const launchStartedAt = performance.now();
+    const { config } = this;
+    log.info(`session ${id} launching${config.proxyUrl ? " via proxy" : " without proxy"}`);
     try {
-      const { config } = this;
       browser = await ChromeBrowser.launch({
         chromePath: config.chromePath,
         headless: config.headless,
@@ -124,7 +128,7 @@ export class SessionPool {
       this.sessions.add(new BrowserSession(id, browser));
       this.consecutiveLaunchFailures = 0;
       this.counters.launched++;
-      console.info(`[pool] session ${id} ready`);
+      log.info(`session ${id} ready in ${formatDuration(performance.now() - launchStartedAt)} (${this.sessions.size}/${config.poolSize} ready)`);
       this.notifyReady();
     } catch (error) {
       if (browser) {
@@ -134,7 +138,7 @@ export class SessionPool {
       if (this.stopped) return;
       this.consecutiveLaunchFailures++;
       this.counters.launchErrors++;
-      console.error(`[pool] session ${id} failed to start: ${(error as Error).message}`);
+      log.error(`session ${id} failed to start: ${(error as Error).message}`);
       this.launchInBackground();
     }
   }

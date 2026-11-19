@@ -1,4 +1,10 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { setLogLevel } from "../../src/logging/logger";
+
+setLogLevel("error");
 import { SessionBlockedError } from "../../src/errors";
 import { createHttpServer } from "../../src/http/http-server";
 import type { FlightSearch, FlightSearchRequest, FlightSearchResult } from "../../src/search/flight-search-service";
@@ -78,6 +84,22 @@ describe("/url", () => {
       expect((await fetch(url, { headers: { "x-api-key": "secret" } })).status).toBe(200);
     } finally {
       locked.stop();
+    }
+  });
+
+  test("saves each search response to outputDir and returns x-request-id", async () => {
+    const outputDir = await mkdtemp(join(tmpdir(), "http-output-"));
+    const saving = createHttpServer(fakeSearch, () => ({}), { port: 0, outputDir });
+    try {
+      const response = await fetch(`http://localhost:${saving.port}/url?url=${encodeURIComponent(SEARCH_URL)}`);
+      const requestId = response.headers.get("x-request-id");
+      expect(requestId).toMatch(/^[0-9a-f]{6}$/);
+      const [file] = await readdir(outputDir);
+      expect(file).toEndWith(`_best_pass_${requestId}.json`);
+      expect(JSON.parse(await readFile(join(outputDir, file!), "utf8"))).toEqual(await response.json());
+    } finally {
+      saving.stop();
+      await rm(outputDir, { recursive: true, force: true });
     }
   });
 

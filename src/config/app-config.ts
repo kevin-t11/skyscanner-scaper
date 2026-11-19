@@ -1,4 +1,6 @@
 /** Runtime configuration, read once from the environment. */
+import { parseLogLevel, type LogLevel } from "../logging/logger";
+
 export interface AppConfig {
   port: number;
   /** Interface to listen on; localhost by default because every search spends proxy bandwidth. */
@@ -18,6 +20,9 @@ export interface AppConfig {
   currency: string;
   /** Upper bound for one search, including all polls. */
   searchDeadlineMs: number;
+  /** Where each `/url` response is saved as JSON; `undefined` disables saving. */
+  outputDir: string | undefined;
+  logLevel: LogLevel;
 }
 
 type Env = Record<string, string | undefined>;
@@ -41,5 +46,8 @@ export function loadAppConfig(env: Env = process.env): AppConfig {
     locale: env.LOCALE || "en-US",
     currency: env.CURRENCY || "USD",
     searchDeadlineMs: positiveInt(env.SEARCH_DEADLINE_MS, 12_000),
+    // Unset → ./output; set to an empty string to disable saving.
+    outputDir: env.OUTPUT_DIR === undefined ? "output" : env.OUTPUT_DIR || undefined,
+    logLevel: parseLogLevel(env.LOG_LEVEL),
   };
 }

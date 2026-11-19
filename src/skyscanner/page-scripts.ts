@@ -47,32 +47,29 @@ export async function lookupRouteEntitiesInPage(args: { pathAndQuery: string; ti
 }
 
 // ---- Unified search --------------------------------------------------------
+// The server drives the create/poll loop (so it can log each step); every step
+// is one in-page request whose results are merged into page-side state.
 
-export interface UnifiedSearchArgs {
-  endpoint: string;
+export interface UnifiedSearchStepArgs {
+  /** `globalThis` key holding this search's merged results until `collectUnifiedSearchInPage`. */
+  stateKey: string;
+  url: string;
+  method: "POST" | "GET";
+  body?: string;
   headers: Record<string, string>;
-  body: UnifiedSearchRequestBody;
-  /** With `stopWhenEnough`, stop once this many itineraries are known. */
-  enoughResults: number;
-  stopWhenEnough: boolean;
-  deadlineMs: number;
-  pollIntervalMs: number;
+  /** Aborts the request (and its body transfer) after this long. */
+  timeoutMs: number;
 }
 
-export interface UnifiedSearchOutcome {
-  /** Last HTTP status; 403 means PerimeterX rejected this browser session, 0 a network failure. */
+export interface UnifiedSearchStep {
+  /** HTTP status; 403 means PerimeterX rejected the session, 0 that the request failed. */
   httpStatus: number;
-  /** Why polling stopped early: the request failed, or a 200 response was not valid JSON. */
-  failure?: "network" | "malformed";
-  complete: boolean;
-  /** True when the deadline ended the search before Skyscanner reported `complete`. */
-  timedOut: boolean;
-  upstreamRequests: number;
-  elapsedMs: number;
-  firstResultsMs: number | null;
+  /** Set when the step produced no usable response. */
+  failure?: "network" | "malformed" | "timeout";
+  status?: UnifiedSearchResponse["context"]["status"];
+  sessionId?: string;
+  /** Distinct itineraries merged so far, across all steps. */
   resultCount: number;
-  /** JSON of `UnifiedSearchPayload`: one string crosses CDP faster than a large object. */
-  payloadJson: string;
 }
 
 export interface UnifiedSearchPayload {
@@ -80,72 +77,57 @@ export interface UnifiedSearchPayload {
   agents: ApiAgent[];
 }
 
-/**
- * Creates the search and polls until Skyscanner reports `complete`, the
- * deadline passes (in-flight requests are aborted), or enough results arrived.
- * Polls sometimes return an empty list, so results are merged by id.
- */
-export async function runUnifiedSearchInPage(args: UnifiedSearchArgs): Promise<UnifiedSearchOutcome> {
-  const startedAt = performance.now();
-  const resultsById = new Map<string, ApiItinerary>();
-  const agentsById = new Map<string, ApiAgent>();
-  let context: Partial<UnifiedSearchResponse["context"]> = {};
-  let upstreamRequests = 0;
-  let firstResultsMs: number | null = null;
-  let timedOut = false;
-  let failure: UnifiedSearchOutcome["failure"];
-  const deadline = new AbortController();
-  const deadlineTimer = setTimeout(() => deadline.abort(), args.deadlineMs);
+interface UnifiedSearchState {
+  results: Map<string, ApiItinerary>;
+  agents: Map<string, ApiAgent>;
+}
 
-  const request = async (url: string, init: RequestInit): Promise<number> => {
-    upstreamRequests++;
-    // Reading the body is part of the transfer: a drop there is a network failure, not bad JSON.
-    let body: string;
-    try {
-      const response = await fetch(url, { ...init, credentials: "include", headers: args.headers, signal: deadline.signal });
-      if (response.status !== 200) return response.status;
-      body = await response.text();
-    } catch {
-      if (deadline.signal.aborted) timedOut = true;
-      else failure = "network";
-      return deadline.signal.aborted ? 200 : 0;
-    }
-    let data: UnifiedSearchResponse;
-    try {
-      data = JSON.parse(body);
-    } catch {
-      failure = "malformed";
-      return 200;
-    }
-    context = data.context ?? {};
-    for (const itinerary of data.itineraries?.results ?? []) resultsById.set(itinerary.id, itinerary);
-    for (const agent of data.itineraries?.agents ?? []) agentsById.set(agent.id, agent);
-    if (firstResultsMs === null && resultsById.size > 0) firstResultsMs = Math.round(performance.now() - startedAt);
-    return 200;
-  };
+/** One create (POST) or poll (GET) request. Polls sometimes return an empty list, so results are merged by id. */
+export async function requestUnifiedSearchStepInPage(args: UnifiedSearchStepArgs): Promise<UnifiedSearchStep> {
+  const store = globalThis as unknown as Record<string, UnifiedSearchState | undefined>;
+  const state = (store[args.stateKey] ??= { results: new Map(), agents: new Map() });
 
-  let httpStatus = await request(args.endpoint, { method: "POST", body: JSON.stringify(args.body) });
-  while (httpStatus === 200 && !failure && !timedOut && context.status !== "complete" && context.sessionId) {
-    if (args.stopWhenEnough && resultsById.size >= args.enoughResults) break;
-    if (performance.now() - startedAt + args.pollIntervalMs > args.deadlineMs) {
-      timedOut = true;
-      break;
-    }
-    await new Promise((resolve) => setTimeout(resolve, args.pollIntervalMs));
-    httpStatus = await request(args.endpoint + encodeURIComponent(context.sessionId), { method: "GET" });
+  // Reading the body is part of the transfer: a drop there is a network failure, not bad JSON.
+  let text: string;
+  try {
+    const response = await fetch(args.url, {
+      method: args.method,
+      body: args.body,
+      headers: args.headers,
+      credentials: "include",
+      signal: AbortSignal.timeout(args.timeoutMs),
+    });
+    if (response.status !== 200) return { httpStatus: response.status, resultCount: state.results.size };
+    text = await response.text();
+  } catch (error) {
+    const timedOut = error instanceof DOMException && error.name === "TimeoutError";
+    return { httpStatus: timedOut ? 200 : 0, failure: timedOut ? "timeout" : "network", resultCount: state.results.size };
   }
-  clearTimeout(deadlineTimer);
 
-  const payload: UnifiedSearchPayload = { results: [...resultsById.values()], agents: [...agentsById.values()] };
+  let data: UnifiedSearchResponse;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    return { httpStatus: 200, failure: "malformed", resultCount: state.results.size };
+  }
+  for (const itinerary of data.itineraries?.results ?? []) state.results.set(itinerary.id, itinerary);
+  for (const agent of data.itineraries?.agents ?? []) state.agents.set(agent.id, agent);
   return {
-    httpStatus,
-    failure,
-    complete: !timedOut && context.status === "complete",
-    timedOut,
-    upstreamRequests,
-    elapsedMs: Math.round(performance.now() - startedAt),
-    firstResultsMs,
-    resultCount: resultsById.size,
-    payloadJson: JSON.stringify(payload),
+    httpStatus: 200,
+    status: data.context?.status,
+    sessionId: data.context?.sessionId,
+    resultCount: state.results.size,
   };
+}
+
+/** Returns the merged results as JSON (one string crosses CDP faster than a large object) and frees the state. */
+export function collectUnifiedSearchInPage(args: { stateKey: string }): string {
+  const store = globalThis as unknown as Record<string, UnifiedSearchState | undefined>;
+  const state = store[args.stateKey];
+  delete store[args.stateKey];
+  const payload: UnifiedSearchPayload = {
+    results: state ? [...state.results.values()] : [],
+    agents: state ? [...state.agents.values()] : [],
+  };
+  return JSON.stringify(payload);
 }

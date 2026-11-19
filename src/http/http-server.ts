@@ -1,10 +1,12 @@
-/** HTTP layer: authentication, input validation, and mapping results/errors to the envelope. */
+/** HTTP layer: authentication, input validation, logging, saving output, and mapping results/errors to the envelope. */
 import {
   InvalidSearchUrlError,
   NoSessionAvailableError,
   SessionBlockedError,
   UpstreamError,
 } from "../errors";
+import { createLogger, formatDuration, type Logger } from "../logging/logger";
+import { saveSearchOutput } from "../output/search-output-writer";
 import type { FlightSearch, FlightSearchRequest } from "../search/flight-search-service";
 import { failEnvelope, passEnvelope, type FailureCode, type SearchEnvelope } from "./search-envelope";
 import { InvalidRequestError, parseSearchRequest, type RawSearchInput } from "./search-request";
@@ -14,6 +16,8 @@ export interface HttpServerOptions {
   hostname?: string;
   /** When set, `/url` requires `x-api-key: <apiKey>`. */
   apiKey?: string;
+  /** When set, every `/url` search response is also saved there as a JSON file. */
+  outputDir?: string;
 }
 
 const HTTP_STATUS: Record<FailureCode, number> = {
@@ -33,29 +37,65 @@ function failureCodeFor(error: unknown): FailureCode {
   return "internal_error";
 }
 
-const envelopeResponse = (envelope: SearchEnvelope, code?: FailureCode) =>
-  Response.json(envelope, { status: code ? HTTP_STATUS[code] : 200 });
+const newRequestId = () => crypto.randomUUID().slice(0, 6);
 
-async function handleSearch(search: FlightSearch, input: RawSearchInput): Promise<Response> {
-  const startedAt = performance.now();
-  const elapsed = () => Math.round(performance.now() - startedAt);
-  let request: FlightSearchRequest | undefined;
-  try {
-    request = parseSearchRequest(input);
-    return envelopeResponse(passEnvelope(request, await search.search(request), elapsed()));
-  } catch (error) {
-    const code = failureCodeFor(error);
-    if (code === "internal_error") console.error("[http] unexpected error", error);
-    const message = code === "internal_error" ? "internal error" : (error as Error).message;
-    return envelopeResponse(failEnvelope({ code, message }, elapsed(), request ? { request } : { input }), code);
+const envelopeResponse = (envelope: SearchEnvelope, requestId: string, code?: FailureCode) =>
+  Response.json(envelope, { status: code ? HTTP_STATUS[code] : 200, headers: { "x-request-id": requestId } });
+
+const describeInput = (input: RawSearchInput) =>
+  `sort=${input.sort ?? "best"} max=${input.max ?? 50}${input.fast ? ` fast=${input.fast}` : ""} url=${input.url ?? "-"}`;
+
+function logOutcome(log: Logger, envelope: SearchEnvelope): void {
+  if (envelope.status === "pass" && envelope.result) {
+    const { count, total, complete, itineraries } = envelope.result;
+    const top = itineraries[0];
+    const topLabel = top ? ` · top ${top.priceFormatted || top.price}, ${top.durationMinutes} min` : "";
+    log.info(`pass · ${count}/${total} flights${complete ? "" : " (partial)"}${topLabel} · ${formatDuration(envelope.timeElapsedMs)}`);
+  } else {
+    const failure = envelope.failed as { code?: string; message?: string };
+    log.warn(`fail · ${failure.code}: ${failure.message} · ${formatDuration(envelope.timeElapsedMs)}`);
   }
 }
 
-const rejectInput = (input: RawSearchInput, code: FailureCode, message: string) =>
-  envelopeResponse(failEnvelope({ code, message }, 0, { input }), code);
-
 export function createHttpServer(search: FlightSearch, poolHealth: () => unknown, options: HttpServerOptions) {
   const isAuthorized = (req: Request) => !options.apiKey || req.headers.get("x-api-key") === options.apiKey;
+
+  async function finish(envelope: SearchEnvelope, requestId: string, log: Logger, code?: FailureCode): Promise<Response> {
+    logOutcome(log, envelope);
+    if (options.outputDir) {
+      try {
+        log.info(`saved ${await saveSearchOutput(options.outputDir, envelope, requestId)}`);
+      } catch (error) {
+        log.warn(`could not save output: ${(error as Error).message}`);
+      }
+    }
+    return envelopeResponse(envelope, requestId, code);
+  }
+
+  async function handleSearch(method: string, input: RawSearchInput): Promise<Response> {
+    const requestId = newRequestId();
+    const log = createLogger(`req ${requestId}`, { timed: true });
+    log.info(`${method} /url ${describeInput(input)}`);
+    let request: FlightSearchRequest | undefined;
+    try {
+      request = parseSearchRequest(input);
+      const result = await search.search(request, log);
+      return await finish(passEnvelope(request, result, log.elapsedMs()), requestId, log);
+    } catch (error) {
+      const code = failureCodeFor(error);
+      if (code === "internal_error") log.error(`unexpected error: ${(error as Error).stack ?? error}`);
+      const message = code === "internal_error" ? "internal error" : (error as Error).message;
+      const envelope = failEnvelope({ code, message }, log.elapsedMs(), request ? { request } : { input });
+      return await finish(envelope, requestId, log, code);
+    }
+  }
+
+  /** Rejected before a search starts: logged, not saved. */
+  function rejectInput(input: RawSearchInput, code: FailureCode, message: string): Response {
+    const requestId = newRequestId();
+    createLogger(`req ${requestId}`).warn(`rejected · ${code}: ${message}`);
+    return envelopeResponse(failEnvelope({ code, message }, 0, { input }), requestId, code);
+  }
 
   return Bun.serve({
     port: options.port,
@@ -68,7 +108,7 @@ export function createHttpServer(search: FlightSearch, poolHealth: () => unknown
         GET: (req) => {
           const input = Object.fromEntries(new URL(req.url).searchParams);
           if (!isAuthorized(req)) return rejectInput(input, "unauthorized", "missing or invalid x-api-key");
-          return handleSearch(search, input);
+          return handleSearch("GET", input);
         },
         POST: async (req) => {
           // Check the key before reading the body, so unauthenticated callers cannot make us parse it.
@@ -77,7 +117,7 @@ export function createHttpServer(search: FlightSearch, poolHealth: () => unknown
           if (!body || typeof body !== "object" || Array.isArray(body)) {
             return rejectInput({}, "invalid_request", "body must be a JSON object");
           }
-          return handleSearch(search, body as RawSearchInput);
+          return handleSearch("POST", body as RawSearchInput);
         },
       },
     },

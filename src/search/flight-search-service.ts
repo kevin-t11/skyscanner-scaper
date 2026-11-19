@@ -1,17 +1,12 @@
 /** The `/url` use case: search URL → route entities → in-page API search → ranked itineraries. */
 import type { AppConfig } from "../config/app-config";
 import { BrowserError, SessionBlockedError, SessionNetworkError, UpstreamError } from "../errors";
+import { createLogger, formatDuration, type Logger } from "../logging/logger";
 import type { BrowserSession } from "../sessions/browser-session";
 import type { SessionPool } from "../sessions/session-pool";
 import type { Itinerary, SortOrder } from "../skyscanner/itinerary";
 import { rankItineraries } from "../skyscanner/itinerary-normalizer";
-import {
-  lookupRouteEntitiesInPage,
-  runUnifiedSearchInPage,
-  toPageExpression,
-  type RouteLookupResult,
-  type UnifiedSearchOutcome,
-} from "../skyscanner/page-scripts";
+import { lookupRouteEntitiesInPage, toPageExpression, type RouteLookupResult } from "../skyscanner/page-scripts";
 import { parseSearchUrl, type FlightSearchQuery, type ParsedSearchUrl } from "../skyscanner/search-url";
 import {
   buildUnifiedSearchBody,
@@ -19,6 +14,7 @@ import {
   UNIFIED_SEARCH_ENDPOINT,
   type RouteEntities,
 } from "../skyscanner/unified-search-api";
+import { runUnifiedSearch, type UnifiedSearchOutcome } from "../skyscanner/unified-search-runner";
 
 export interface FlightSearchRequest {
   searchUrl: string;
@@ -46,7 +42,8 @@ export interface FlightSearchResult {
 }
 
 export interface FlightSearch {
-  search(request: FlightSearchRequest): Promise<FlightSearchResult>;
+  /** `log` receives one line per step (session, route lookup, each poll); defaults to a `search` logger. */
+  search(request: FlightSearchRequest, log?: Logger): Promise<FlightSearchResult>;
 }
 
 const POLL_INTERVAL_MS = 600;
@@ -64,20 +61,22 @@ export class FlightSearchService implements FlightSearch {
     private readonly config: AppConfig,
   ) {}
 
-  async search(request: FlightSearchRequest): Promise<FlightSearchResult> {
+  async search(request: FlightSearchRequest, log: Logger = createLogger("search", { timed: true })): Promise<FlightSearchResult> {
     const startedAt = performance.now();
     const parsedUrl = parseSearchUrl(request.searchUrl);
 
     for (let attempt = 1; ; attempt++) {
       const session = await this.pool.acquire();
+      log.info(`session ${session.id} acquired${attempt > 1 ? ` (retry ${attempt - 1})` : ""}`);
       try {
-        return await session.run(() => this.searchOnSession(session, parsedUrl, request, startedAt));
+        return await session.run(() => this.searchOnSession(session, parsedUrl, request, startedAt, log));
       } catch (error) {
         // Blocks, network failures (e.g. a dead sticky proxy) and browser failures (crash, lost CDP
         // connection) are tied to this session: retire it and retry on a fresh one with a new IP.
         const retryable =
           error instanceof SessionBlockedError || error instanceof SessionNetworkError || error instanceof BrowserError;
         if (!retryable) throw error;
+        log.warn(`session ${session.id} failed: ${(error as Error).message}`);
         this.pool.retire(session, (error as Error).message);
         if (attempt >= MAX_ATTEMPTS) {
           throw error;
@@ -91,13 +90,19 @@ export class FlightSearchService implements FlightSearch {
     parsedUrl: ParsedSearchUrl,
     request: FlightSearchRequest,
     startedAt: number,
+    log: Logger,
   ): Promise<FlightSearchResult> {
     const lookupStartedAt = performance.now();
-    const route = await this.resolveRoute(session, parsedUrl);
+    const route = await this.resolveRoute(session, parsedUrl, log);
     const routeLookupMs = Math.round(performance.now() - lookupStartedAt);
 
-    const outcome = await this.runUnifiedSearch(session, parsedUrl.query, route, request);
+    const outcome = await this.runUnifiedSearch(session, parsedUrl.query, route, request, log);
     const { total, itineraries } = rankItineraries(outcome.payloadJson, request.sort, request.maxItems, this.pool.origin);
+    const stoppedBy = outcome.complete ? "complete" : outcome.timedOut ? "deadline reached" : request.fast ? "fast mode" : "partial";
+    log.info(
+      `${stoppedBy} · ${total} flights in ${outcome.upstreamRequests} requests · search ${formatDuration(outcome.elapsedMs)}` +
+        (outcome.firstResultsMs === null ? "" : `, first results ${formatDuration(outcome.firstResultsMs)}`),
+    );
     return {
       query: parsedUrl.query,
       complete: outcome.complete,
@@ -113,10 +118,14 @@ export class FlightSearchService implements FlightSearch {
     };
   }
 
-  private async resolveRoute(session: BrowserSession, { query, pathAndQuery }: ParsedSearchUrl): Promise<RouteEntities> {
+  private async resolveRoute(session: BrowserSession, { query, pathAndQuery }: ParsedSearchUrl, log: Logger): Promise<RouteEntities> {
     const cacheKey = `${query.from}|${query.to}`;
     const cached = this.routeCache.get(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+      log.info(`route ${query.from}→${query.to} cached`);
+      return cached;
+    }
+    const lookupStartedAt = performance.now();
 
     session.upstreamRequests++;
     const lookup = await session.browser.evaluate<RouteLookupResult>(
@@ -136,6 +145,10 @@ export class FlightSearchService implements FlightSearch {
     };
     if (this.routeCache.size >= ROUTE_CACHE_LIMIT) this.routeCache.clear();
     this.routeCache.set(cacheKey, route);
+    log.info(
+      `url fetched · route ${query.from}=${route.originEntityId} → ${query.to}=${route.destinationEntityId} ` +
+        `in ${formatDuration(performance.now() - lookupStartedAt)}`,
+    );
     return route;
   }
 
@@ -144,10 +157,12 @@ export class FlightSearchService implements FlightSearch {
     query: FlightSearchQuery,
     route: RouteEntities,
     request: FlightSearchRequest,
+    log: Logger,
   ): Promise<UnifiedSearchOutcome> {
     const { market, locale, currency, searchDeadlineMs } = this.config;
-    const outcome = await session.browser.evaluate<UnifiedSearchOutcome>(
-      toPageExpression(runUnifiedSearchInPage, {
+    const outcome = await runUnifiedSearch(
+      session.browser,
+      {
         endpoint: UNIFIED_SEARCH_ENDPOINT,
         headers: buildUnifiedSearchHeaders({ market, locale, currency }),
         body: buildUnifiedSearchBody(query, route),
@@ -155,8 +170,16 @@ export class FlightSearchService implements FlightSearch {
         stopWhenEnough: request.fast,
         deadlineMs: searchDeadlineMs,
         pollIntervalMs: POLL_INTERVAL_MS,
-      }),
+      },
+      ({ step, status, resultCount, newResults, elapsedMs }) => {
+        const label = step === 1 ? "search created" : `poll ${step}`;
+        const delta = step === 1 ? "" : ` (+${newResults})`;
+        log.info(`${label} · found ${resultCount} flights${delta} · ${status ?? "?"} · ${formatDuration(elapsedMs)}`);
+      },
     );
+    if (outcome.httpStatus !== 200 || outcome.failure) {
+      log.warn(`search API stopped: HTTP ${outcome.httpStatus}${outcome.failure ? ` (${outcome.failure})` : ""}`);
+    }
     session.upstreamRequests += outcome.upstreamRequests;
 
     if (outcome.httpStatus === 403) {
