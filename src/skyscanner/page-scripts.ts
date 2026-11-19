@@ -60,7 +60,7 @@ export interface UnifiedSearchArgs {
 }
 
 export interface UnifiedSearchOutcome {
-  /** Last HTTP status; 403 means PerimeterX rejected this browser session. */
+  /** Last HTTP status; 403 means PerimeterX rejected this browser session, 0 a network failure. */
   httpStatus: number;
   complete: boolean;
   /** True when the deadline ended the search before Skyscanner reported `complete`. */
@@ -101,8 +101,8 @@ export async function runUnifiedSearchInPage(args: UnifiedSearchArgs): Promise<U
       const response = await fetch(url, { ...init, credentials: "include", headers: args.headers, signal: deadline.signal });
       if (response.status !== 200) return response.status;
       data = await response.json();
-    } catch (error) {
-      if (!deadline.signal.aborted) throw error;
+    } catch {
+      if (!deadline.signal.aborted) return 0;
       timedOut = true;
       return 200;
     }

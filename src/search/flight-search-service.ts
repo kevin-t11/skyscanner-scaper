@@ -1,6 +1,6 @@
 /** The `/url` use case: search URL → route entities → in-page API search → ranked itineraries. */
 import type { AppConfig } from "../config/app-config";
-import { BrowserError, SessionBlockedError, UpstreamError } from "../errors";
+import { BrowserError, SessionBlockedError, SessionNetworkError, UpstreamError } from "../errors";
 import type { BrowserSession } from "../sessions/browser-session";
 import type { SessionPool } from "../sessions/session-pool";
 import type { Itinerary, SortOrder } from "../skyscanner/itinerary";
@@ -73,9 +73,10 @@ export class FlightSearchService implements FlightSearch {
       try {
         return await session.run(() => this.searchOnSession(session, parsedUrl, request, startedAt));
       } catch (error) {
-        // A block or a browser failure (crash, lost CDP connection, retirement) is retried on a fresh session.
-        // A page script error (e.g. a dropped API connection) is an upstream error and keeps the session.
-        const retryable = error instanceof SessionBlockedError || error instanceof BrowserError;
+        // Blocks, network failures (e.g. a dead sticky proxy) and browser failures (crash, lost CDP
+        // connection) are tied to this session: retire it and retry on a fresh one with a new IP.
+        const retryable =
+          error instanceof SessionBlockedError || error instanceof SessionNetworkError || error instanceof BrowserError;
         if (!retryable) throw error;
         this.pool.retire(session, (error as Error).message);
         if (attempt >= MAX_ATTEMPTS) {
@@ -122,7 +123,7 @@ export class FlightSearchService implements FlightSearch {
       toPageExpression(lookupRouteEntitiesInPage, { pathAndQuery, timeoutMs: ROUTE_LOOKUP_TIMEOUT_MS }),
     );
     if (lookup.failure === "timeout") throw new UpstreamError(`route lookup timed out after ${ROUTE_LOOKUP_TIMEOUT_MS} ms`);
-    if (lookup.failure === "network") throw new UpstreamError("route lookup failed: network error");
+    if (lookup.failure === "network") throw new SessionNetworkError("route lookup failed: network error");
     if (lookup.status === 403 || lookup.finalUrl.includes("/captcha")) throw new SessionBlockedError("search page challenged");
     if (!lookup.originEntityId || !lookup.destinationEntityId) {
       throw new UpstreamError(`could not resolve places "${query.from}" / "${query.to}" (HTTP ${lookup.status})`);
@@ -162,6 +163,9 @@ export class FlightSearchService implements FlightSearch {
       // Blocked before any results: retry elsewhere. Blocked mid-search: keep what we have, retire the session.
       if (outcome.resultCount === 0) throw new SessionBlockedError("search API returned 403");
       this.pool.retire(session, "search API returned 403 mid-search");
+    } else if (outcome.httpStatus === 0) {
+      if (outcome.resultCount === 0) throw new SessionNetworkError("search API unreachable: network error");
+      this.pool.retire(session, "search API network error mid-search");
     } else if (outcome.httpStatus !== 200) {
       throw new UpstreamError(`search API returned HTTP ${outcome.httpStatus}`);
     } else if (outcome.timedOut && outcome.resultCount === 0) {

@@ -12,6 +12,9 @@ export class SessionBlockedError extends Error {}
 /** Skyscanner answered, but not with usable results. */
 export class UpstreamError extends Error {}
 
+/** The session's network path failed (e.g. its sticky proxy is down); retry on another session. */
+export class SessionNetworkError extends UpstreamError {}
+
 /** A script running in the page threw (e.g. its fetch failed); Chrome itself still works. */
 export class PageScriptError extends UpstreamError {}
 

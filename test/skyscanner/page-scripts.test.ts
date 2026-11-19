@@ -65,6 +65,16 @@ describe("runUnifiedSearchInPage", () => {
   });
 });
 
+test("reports a network failure as httpStatus 0 and keeps earlier results", async () => {
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    if (calls++ === 0) return Response.json({ context: { status: "incomplete", sessionId: "s" }, itineraries: { results: [{ id: "a" }] } });
+    throw new TypeError("Failed to fetch");
+  }) as unknown as typeof fetch;
+  const outcome = await runUnifiedSearchInPage(searchArgs());
+  expect(outcome).toMatchObject({ httpStatus: 0, complete: false, resultCount: 1 });
+});
+
 describe("lookupRouteEntitiesInPage", () => {
   test("extracts entity ids from the server-rendered search page", async () => {
     const html = `"legs":[{"originEntityId":"95565050","destinationEntityId":"95565058"}],"destination":{"entityId":"95565058","id":"JFK","geoContainerId":"27537542"}`;
