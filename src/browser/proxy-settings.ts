@@ -5,8 +5,16 @@ export interface ProxySettings {
   password?: string;
 }
 
-/** `http://user:pass@host:port` → `{ server: "http://host:port", username, password }`. */
+/**
+ * `http://user:pass@host:port`, or the `host:port:user:pass` form proxy dashboards export,
+ * → `{ server: "http://host:port", username, password }`.
+ */
 export function parseProxyUrl(proxyUrl: string): ProxySettings {
+  const parts = proxyUrl.split(":");
+  if (!proxyUrl.includes("://") && parts.length === 4) {
+    const [host, port, username, password] = parts;
+    return { server: `http://${host}:${port}`, username, password };
+  }
   const url = new URL(proxyUrl);
   return {
     server: `${url.protocol}//${url.hostname}:${url.port}`,

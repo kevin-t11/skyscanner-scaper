@@ -1,6 +1,7 @@
 import type { ChromeBrowser } from "../browser/chrome-browser";
 
-export type BrowserSessionState = "ready" | "retired";
+/** `exclusive`: one task has the page to itself (e.g. solving a challenge); searches skip it. */
+export type BrowserSessionState = "ready" | "exclusive" | "retired";
 
 /**
  * One warmed browser (one sticky proxy IP) plus its usage counters.

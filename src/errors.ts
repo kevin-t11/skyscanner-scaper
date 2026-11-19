@@ -7,7 +7,15 @@ export class InvalidSearchUrlError extends Error {}
 export class NoSessionAvailableError extends Error {}
 
 /** PerimeterX rejected the browser session (HTTP 403 or a captcha redirect). */
-export class SessionBlockedError extends Error {}
+export class SessionBlockedError extends Error {
+  constructor(
+    message: string,
+    /** The "Press & Hold" page, when PerimeterX redirected to one. */
+    readonly challengeUrl?: string,
+  ) {
+    super(message);
+  }
+}
 
 /** Skyscanner answered, but not with usable results. */
 export class UpstreamError extends Error {}

@@ -86,6 +86,19 @@ export class ChromeBrowser {
     return result.value as T;
   }
 
+  /** Dispatches one mouse event at viewport coordinates; `held` keeps the left button down while moving. */
+  async mouse(type: "mouseMoved" | "mousePressed" | "mouseReleased", x: number, y: number, held = false): Promise<void> {
+    const pressing = type !== "mouseMoved";
+    await this.sendToPage("Input.dispatchMouseEvent", {
+      type,
+      x,
+      y,
+      button: pressing || held ? "left" : "none",
+      buttons: type === "mousePressed" || held ? 1 : 0,
+      clickCount: pressing ? 1 : 0,
+    });
+  }
+
   async close(): Promise<void> {
     this.cdp.close();
     this.process.kill();

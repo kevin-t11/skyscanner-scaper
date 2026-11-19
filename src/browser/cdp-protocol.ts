@@ -31,6 +31,17 @@ export interface CdpCommands {
   "Target.getTargets": { params: Record<string, never>; result: { targetInfos: TargetInfo[] } };
   "Target.createTarget": { params: { url: string }; result: { targetId: string } };
   "Target.attachToTarget": { params: { targetId: string; flatten: true }; result: { sessionId: string } };
+  "Input.dispatchMouseEvent": {
+    params: {
+      type: "mouseMoved" | "mousePressed" | "mouseReleased";
+      x: number;
+      y: number;
+      button: "none" | "left";
+      buttons: number;
+      clickCount: number;
+    };
+    result: Record<string, never>;
+  };
   "Page.navigate": { params: { url: string }; result: { frameId: string; errorText?: string } };
   "Runtime.evaluate": {
     params: { expression: string; awaitPromise: boolean; returnByValue: boolean };

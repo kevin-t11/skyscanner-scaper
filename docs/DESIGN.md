@@ -1,7 +1,7 @@
 # Skyscanner scraper: design
 
 ## Goal
-`GET /url?url=<skyscanner search URL>&max=50&sort=cheapest|best|fastest` returns normalized itineraries as JSON,
+`POST /url {"url": "<skyscanner search URL>", "max": 50, "sort": "cheapest|best|fastest"}` returns normalized itineraries as JSON,
 as fast and as cheaply as possible.
 
 ## What we know (verified 2026-11-19)
@@ -43,7 +43,7 @@ SearchService ── parse URL ─► entity cache (LRU)  ─miss─► in-page 
 SessionPool (N workers, least-busy)          one worker = 1 headless Chrome + 1 tab + 1 sticky proxy IP
         │                                     warm-up: open home page once → PX sensor sets _px3
         ▼                                     health: 403/captcha → retire, relaunch with a new proxy session
-in-page fetch(): create → poll (adaptive 250ms→1s) → stop at complete | enough results (fast mode) | deadline
+in-page fetch(): create → poll (600 ms pause between polls) → stop at complete | deadline
         │
         ▼
 parse + sort (Skyscanner sortingOptions if present, else cheapest/fastest/best) → slice(max) → JSON
@@ -66,14 +66,12 @@ Why each choice:
 |---|---|
 | Session warm-up (Chrome launch + home page + sensor) | 4.5–7 s, once per session |
 | URL → entity ids (in-page fetch of the search page) | ~430 ms, then 0 (cached per route) |
-| `fast=true`, `max` ≤ 10 | ~1.3 s (create + 1 poll) |
 | First 50+ itineraries | 0.9–1.7 s |
-| `complete` (all agents answered) | 8–12 s; `SEARCH_DEADLINE_MS` caps it (default 12 s) |
+| `complete` (all agents answered) | 8–12 s; capped by the 12 s search deadline (`SEARCH_DEADLINE_MS` in `src/config/app-config.ts`) |
 
 ## Cost (estimate)
 - A full poll for 943 itineraries is ~490 KB gzip on the wire; early polls are smaller. With the 600 ms poll interval a
   complete search is roughly 1–4 MB, so **~$0.5–2 per 1,000 complete searches** at Evomi's $0.49/GB.
-- `fast=true` stops after 1–2 requests (~10–100 KB), so **under $0.05 per 1,000**.
 - Session warm-up is ~0.3–0.8 MB (images, fonts and media blocked; `*.skyscnr.com` CDN bypasses the proxy).
 - Apify actors charge ~$1 per 1,000 *itineraries*; one complete search here returns 75–940 itineraries.
 
