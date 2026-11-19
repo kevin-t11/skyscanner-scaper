@@ -6,15 +6,15 @@ publishes it on port 80. Settings live only in the VM's `.env`, which is never c
 | Setting | Value |
 |---|---|
 | Repository / branch | [kevin-t11/skyscanner-scaper](https://github.com/kevin-t11/skyscanner-scaper) / `main` |
-| Application | `/home/ubuntu/skyscanner-scaper` |
+| Application | `/home/ubuntu/skyscanner-scaper/scraper` (the repo's `scraper/` folder) |
 | Service | `skyscanner` (`deploy/skyscanner.service`: `xvfb-run bun src/main.ts`) |
-| Public API | `http://<LIGHTSAIL_IP>` (`POST /url`, `GET /health`) |
+| Public API | `http://<LIGHTSAIL_IP>` (`POST /search`, `GET /places`, `POST /url`, `GET /health`) |
 
 ## First install
 
 ```bash
 git clone https://github.com/kevin-t11/skyscanner-scaper.git ~/skyscanner-scaper
-cd ~/skyscanner-scaper
+cd ~/skyscanner-scaper/scraper
 bash deploy/install.sh     # installs xvfb, Chrome, Bun; creates .env with a generated API_KEY; stops
 nano .env                  # set PROXY_URL and POOL_SIZE
 bash deploy/install.sh     # installs and starts the service
@@ -30,16 +30,29 @@ PROXY_URL=core-residential.evomi.com:1000:USER:PASS_country-IN_session-{session}
 ## Update
 
 ```bash
-cd ~/skyscanner-scaper
+cd ~/skyscanner-scaper/scraper
 git pull
 bash deploy/install.sh
+bash deploy/check.sh
+```
+
+## Moving to the `scraper/` folder (once)
+
+The code moved from the repo root into `scraper/`. On a server installed before that move, run this once:
+
+```bash
+cd ~/skyscanner-scaper
+git pull
+mv .env scraper/.env
+cd scraper
+bash deploy/install.sh     # points the service at the new folder and restarts it
 bash deploy/check.sh
 ```
 
 ## Roll back
 
 ```bash
-cd ~/skyscanner-scaper
+cd ~/skyscanner-scaper/scraper
 git log --oneline -5
 git checkout <previous-commit>
 bash deploy/install.sh
