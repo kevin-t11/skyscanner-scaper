@@ -69,11 +69,11 @@ To run it as a service, put `xvfb-run -a bun src/main.ts` in a systemd unit or a
 Stop it with Ctrl-C or `SIGTERM`; browsers are closed cleanly.
 
 ## Configuration
-Only these come from `.env` (Bun loads it automatically) or the environment:
+Only these, and only from the `.env` file in the project folder (shell or systemd variables are ignored):
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `PROXY_URL` | none | `http://user:pass@host:port`; `{session}` is replaced per browser so each one keeps a sticky IP |
+| `PROXY_URL` | none | `http://user:pass@host:port` or `host:port:user:pass`; `{session}` is replaced per browser so each one keeps a sticky IP |
 | `PORT` | `8000` | HTTP port; the server listens on `localhost` only |
 | `POOL_SIZE` | `1` | Browser sessions (one IP and ~300–700 MB RAM each); raise it for parallel searches |
 | `API_KEY` | none | When set, `/url` requires the `x-api-key` header |
@@ -214,22 +214,15 @@ PROXY_URL=http://USERNAME:PASSWORD_country-IN_session-{session}_lifetime-30@rp.e
 
 ## Deploy (AWS Lightsail / any Ubuntu server)
 
-`deploy/setup-lightsail.sh` sets everything up in one run: Google Chrome, Xvfb (virtual display for the
-headful browser), Bun, a 2 GB swap file on small instances, the code, `.env`, a `skyscanner` systemd service,
-and a daily cleanup of `output/` files older than 7 days. Re-running it updates the code and restarts the service.
+On the server, from a clone of this repository:
 
-1. Create an Ubuntu 22.04/24.04 instance: at least 2 GB RAM for `POOL_SIZE=1`, plus about 700 MB per extra browser.
-2. SSH in and run:
-   ```bash
-   curl -fsSL https://raw.githubusercontent.com/kevin-t11/skyscanner-scaper/main/deploy/setup-lightsail.sh -o setup.sh
-   PROXY_URL='host:port:user:pass_session-{session}' POOL_SIZE=1 bash setup.sh
-   ```
-   Optional: `API_KEY=...` (generated and printed when omitted), `BRANCH=...`, and `DOMAIN=api.example.com`
-   to add Caddy with automatic HTTPS (then open ports 80/443 in the Lightsail firewall).
-3. Check it: `curl localhost:8000/health`, logs with `journalctl -u skyscanner -f`.
+```bash
+bash deploy/install.sh     # 1st run: installs xvfb, Chrome, Bun and creates .env (generated API_KEY)
+nano .env                  # set PROXY_URL and POOL_SIZE
+bash deploy/install.sh     # runs the tests, installs and starts the `skyscanner` service
+```
 
-The API listens on localhost only. Call it from the same machine, through Caddy (`DOMAIN`), or over an SSH
-tunnel: `ssh -L 8000:localhost:8000 ubuntu@<server-ip>`.
+Updates: `git pull && bash deploy/install.sh`. Full guide (rollback, verification, operations): [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Troubleshooting
 | Symptom | Fix |
@@ -301,8 +294,10 @@ What each folder and file is for, in the order a `/url` request passes through t
 | `package.json` | Scripts (`start`, `dev`, `test`, `typecheck`) and dev dependencies |
 | `bun.lock` | Locked dependency versions |
 | `tsconfig.json` | TypeScript settings (strict mode) |
-| `.env.example` | Every environment variable with a comment; copy it to `.env` |
-| `deploy/setup-lightsail.sh` | One-shot Ubuntu/Lightsail setup: Chrome, Xvfb, Bun, swap, code, `.env`, systemd service, output cleanup, optional Caddy HTTPS |
+| `.env.example` | Every setting with a comment; copy it to `.env` (the only place settings are read from) |
+| `DEPLOYMENT.md` | Lightsail deployment: first install, update, rollback, verification, operations |
+| `deploy/install.sh` | Installs xvfb, Chrome and Bun, creates `.env` on the first run, runs the tests, installs and restarts the `skyscanner` service |
+| `deploy/skyscanner.service` | systemd unit template used by `install.sh` |
 | `.gitignore` | Keeps `.env`, `node_modules/`, HAR captures and `/output/` out of git |
 | `README.md` | This guide |
 | `docs/DESIGN.md` | Research notes: how Skyscanner's API and PerimeterX work, design choices, measured speed and cost |
@@ -356,7 +351,8 @@ What each folder and file is for, in the order a `/url` request passes through t
 ### `src/config/`, `src/logging/`, `src/output/`
 | File | What it does |
 |---|---|
-| `config/app-config.ts` | `loadAppConfig`: reads the few environment variables and holds the fixed settings (site, deadline, output folder, Chrome lookup) |
+| `config/app-config.ts` | `loadAppConfig`: reads the few settings from `.env` and holds the fixed settings (site, deadline, output folder, Chrome lookup) |
+| `config/dotenv.ts` | `readDotEnv`: parses `.env` (comments, inline comments, quotes); the only settings source |
 | `logging/logger.ts` | `createLogger`: compact log lines (`time LEVEL [scope +elapsed] message`), the `LOGGING` switch, and escaping so input can't forge log lines |
 | `output/search-output-writer.ts` | `saveSearchOutput`: writes each response to `output/` as `{time}_{from}-{to}_{sort}_{pass\|fail}_{id}.json` |
 

@@ -1,10 +1,11 @@
 /**
- * Runtime configuration. Only what changes between machines comes from the environment
+ * Runtime configuration. Only what changes between machines comes from the `.env` file
  * (`PROXY_URL`, `PORT`, `POOL_SIZE`, `API_KEY`, `LOGGING`, optional `CHROME_PATH`);
  * everything else is a fixed setting below.
  */
 import { existsSync } from "node:fs";
 import { parseLoggingEnabled } from "../logging/logger";
+import { readDotEnv } from "./dotenv";
 
 /** Skyscanner site and market every session uses; results are priced in this currency. */
 const SKYSCANNER_SITE = { host: "www.skyscanner.co.in", market: "IN", locale: "en-GB", currency: "INR" } as const;
@@ -56,7 +57,8 @@ const positiveInt = (value: string | undefined, fallback: number): number => {
 
 const findChrome = () => CHROME_CANDIDATES.find((path) => existsSync(path)) ?? "google-chrome";
 
-export function loadAppConfig(env: Env = process.env): AppConfig {
+/** Settings come only from `.env` in the working directory; shell and systemd variables are ignored. */
+export function loadAppConfig(env: Env = readDotEnv()): AppConfig {
   return {
     port: positiveInt(env.PORT, 8000),
     hostname: "127.0.0.1",
