@@ -22,10 +22,11 @@ import { CABIN_LABELS, sortItineraries, type CabinClass, type Place, type Search
 const PAGE_SIZE = 10;
 const MAX_RESULTS = 300;
 
+/** Local calendar date, so "today" matches the user's clock rather than UTC. */
 const isoDate = (offsetDays: number) => {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
 type Status = { kind: "idle" } | { kind: "loading" } | { kind: "done"; response: SearchResponse } | { kind: "error"; message: string };
@@ -62,9 +63,9 @@ export function SearchApp() {
           sort: "best",
         }),
       });
-      const response = (await res.json()) as SearchResponse;
+      const response = (await res.json()) as SearchResponse & { error?: string };
       if (response.status === "pass") setStatus({ kind: "done", response });
-      else setStatus({ kind: "error", message: response.failed?.message ?? "Search failed" });
+      else setStatus({ kind: "error", message: response.failed?.message ?? response.error ?? "Search failed" });
     } catch {
       setStatus({ kind: "error", message: "Could not reach the search service" });
     }
@@ -159,7 +160,7 @@ export function SearchApp() {
         </div>
 
         <div className="grid items-end gap-3 md:grid-cols-[1fr_auto_1fr_minmax(12rem,0.8fr)_auto]">
-          <PlaceField label="From" direction="from" value={from} onChange={setFrom} />
+          <PlaceField key={`from-${from?.code ?? ""}`} label="From" direction="from" value={from} onChange={setFrom} />
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -178,7 +179,7 @@ export function SearchApp() {
             </TooltipTrigger>
             <TooltipContent>Swap</TooltipContent>
           </Tooltip>
-          <PlaceField label="To" direction="to" value={to} onChange={setTo} />
+          <PlaceField key={`to-${to?.code ?? ""}`} label="To" direction="to" value={to} onChange={setTo} />
           <div className="space-y-1.5">
             <span className="block text-xs text-muted-foreground">{trip === "return" ? "Dates" : "Date"}</span>
             <DateField trip={trip} value={dates} onChange={setDates} min={isoDate(0)} />
