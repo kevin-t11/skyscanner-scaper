@@ -228,7 +228,9 @@ export class FlightSearchService implements FlightSearch {
     );
     if (result.failure === "network") throw new SessionNetworkError("place autocomplete failed: network error");
     if (result.failure === "timeout") throw new SessionNetworkError(`place autocomplete timed out after ${PLACES_TIMEOUT_MS} ms`);
-    if (result.status === 403) throw new SessionBlockedError("place autocomplete returned 403");
+    // Autocomplete answers some inputs (e.g. `NYCA`) with 403 even on healthy sessions: treat it as
+    // "no suggestions" (not cached), so codes fall back to the search page, which detects real blocks.
+    if (result.status === 403) return [];
     if (result.status !== 200 || result.failure) {
       throw new UpstreamError(`place autocomplete returned HTTP ${result.status}${result.failure ? ` (${result.failure})` : ""}`);
     }
