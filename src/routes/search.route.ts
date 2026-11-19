@@ -50,7 +50,6 @@ function dateField(input: RawSearchInput, field: "departDate" | "returnDate"): s
 function parseFieldsRequest(input: RawSearchInput): ParsedSearchRequest {
   const from = placeField(input, "from");
   const to = placeField(input, "to");
-  if (from.toLowerCase() === to.toLowerCase()) throw new InvalidRequestError("`from` and `to` must differ");
 
   const departDate = dateField(input, "departDate");
   const returnDate = input.returnDate === undefined || input.returnDate === null || input.returnDate === "" ? null : dateField(input, "returnDate");

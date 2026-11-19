@@ -190,6 +190,7 @@ export class FlightSearchService implements FlightSearch {
     ]);
 
     let resolved: ResolvedRoute;
+    if (from && to && from.entityId === to.entityId) throw new PlaceNotFoundError("`from` and `to` are the same place");
     if (from && to) {
       resolved = {
         route: {
