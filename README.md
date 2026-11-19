@@ -288,7 +288,6 @@ src/
 
 ## Development
 ```bash
-bun test            # unit tests (live-response fixture, no network)
 bun run typecheck   # tsc --noEmit
 bun run dev         # restart on file changes
 ```
@@ -304,7 +303,7 @@ What each folder and file is for, in the order a `/url` request passes through t
 ### Root
 | File | What it does |
 |---|---|
-| `package.json` | Scripts (`start`, `dev`, `test`, `typecheck`) and dev dependencies |
+| `package.json` | Scripts (`start`, `dev`, `typecheck`) and dev dependencies |
 | `bun.lock` | Locked dependency versions |
 | `tsconfig.json` | TypeScript settings (strict mode) |
 | `.env.example` | Every setting with a comment; copy it to `.env` (the only place settings are read from) |
@@ -370,17 +369,4 @@ What each folder and file is for, in the order a `/url` request passes through t
 | `config/dotenv.ts` | `readDotEnv`: parses `.env` (comments, inline comments, quotes); the only settings source |
 | `logging/logger.ts` | `createLogger`: compact log lines (`time LEVEL [scope +elapsed] message`), the `LOGGING` switch, and escaping so input can't forge log lines |
 | `output/search-output-writer.ts` | `saveSearchOutput`: writes each response to `output/` as `{time}_{from}-{to}_{sort}_{pass\|fail}_{id}.json` |
-
-### `test/` (`bun test`, no network needed)
-| File | What it tests |
-|---|---|
-| `fixtures/web-unified-search.san-sfo.json` | A captured live API response used by the parser tests |
-| `routes/routes.test.ts` | `/url` and `/health` end to end against a fake search: defaults, errors, API key, saved files, 404 |
-| `skyscanner/search-url.test.ts` | URL parsing and rejection of bad URLs and dates |
-| `skyscanner/unified-search-api.test.ts` | That the request body matches what Skyscanner's website sends |
-| `skyscanner/unified-search-runner.test.ts` | The create/poll loop: merging, deadline, 403, network drops, invalid JSON |
-| `skyscanner/page-scripts.test.ts` | Airport-id lookup, and its timeout and network-failure cases |
-| `skyscanner/itinerary-normalizer.test.ts` | Normalizing, sorting, `max`, missing fields |
-| `logging/logger.test.ts` | Log format, levels, `LOGGING=disabled`, newline escaping |
-| `output/search-output-writer.test.ts` | Output file names and contents |
 
