@@ -14,7 +14,7 @@ export function parseDotEnv(text: string): Record<string, string> {
     if (!match) continue;
     const [, key, rest] = match as unknown as [string, string, string];
     const quoted = /^(["'])(.*)\1/.exec(rest);
-    values[key] = quoted ? quoted[2]! : rest.replace(/\s+#.*$/, "").trim();
+    values[key] = quoted ? quoted[2]! : rest.replace(/(^|\s+)#.*$/, "").trim();
   }
   return values;
 }
