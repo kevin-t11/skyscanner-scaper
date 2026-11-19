@@ -294,8 +294,8 @@ export class FlightSearchService implements FlightSearch {
       // Skyscanner's fault, not the session's: keep the session and any results already merged.
       if (outcome.resultCount === 0) throw new UpstreamError("search API returned invalid JSON");
     } else if (outcome.failure === "network") {
-      if (outcome.resultCount === 0) throw new SessionNetworkError("search API unreachable: network error");
-      this.pool.retire(session, "search API network error mid-search");
+      // A dead proxy connection mid-search leaves a partial list; a fresh session usually completes it.
+      throw new SessionNetworkError(`search API unreachable: network error${outcome.resultCount ? " mid-search" : ""}`);
     } else if (outcome.httpStatus !== 200) {
       throw new UpstreamError(`search API returned HTTP ${outcome.httpStatus}`);
     } else if (outcome.timedOut && outcome.resultCount === 0) {
