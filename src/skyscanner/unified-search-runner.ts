@@ -21,6 +21,10 @@ export interface UnifiedSearchOptions {
   body: UnifiedSearchRequestBody;
   deadlineMs: number;
   pollIntervalMs: number;
+  /** Cap for one create/poll request; a request that hangs past it is a dead connection (e.g. proxy). */
+  requestTimeoutMs: number;
+  /** Stop once this many polls in a row add no itineraries (0 = wait for `complete`). */
+  stablePolls: number;
 }
 
 export interface UnifiedSearchProgress {
@@ -40,6 +44,8 @@ export interface UnifiedSearchOutcome {
   complete: boolean;
   /** True when the deadline ended the search before Skyscanner reported `complete`. */
   timedOut: boolean;
+  /** True when polling stopped because the result count stopped growing. */
+  stable: boolean;
   upstreamRequests: number;
   elapsedMs: number;
   firstResultsMs: number | null;
@@ -68,6 +74,7 @@ export async function runUnifiedSearch(
   let sessionId: string | undefined;
   let resultCount = 0;
   let firstResultsMs: number | null = null;
+  let unchangedPolls = 0;
 
   const step = async (url: string, method: "POST" | "GET", body?: string) => {
     upstreamRequests++;
@@ -78,16 +85,20 @@ export async function runUnifiedSearch(
         method,
         body,
         headers: options.headers,
-        timeoutMs: Math.max(1, options.deadlineMs - elapsedMs()),
+        timeoutMs: Math.max(1, Math.min(options.requestTimeoutMs, options.deadlineMs - elapsedMs())),
       }),
     );
     httpStatus = result.httpStatus;
-    if (result.failure === "timeout") timedOut = true;
-    else failure = result.failure;
+    // A request cut by its own cap before the deadline is a dead connection, not a slow search.
+    if (result.failure === "timeout") {
+      if (elapsedMs() >= options.deadlineMs - 50) timedOut = true;
+      else failure = "network";
+    } else failure = result.failure;
     status = result.status ?? status;
     sessionId = result.sessionId ?? sessionId;
     const newResults = result.resultCount - resultCount;
     resultCount = result.resultCount;
+    unchangedPolls = upstreamRequests > 1 && newResults === 0 ? unchangedPolls + 1 : 0;
     if (firstResultsMs === null && resultCount > 0) firstResultsMs = elapsedMs();
     if (httpStatus === 200 && !result.failure) {
       onProgress?.({ step: upstreamRequests, status, resultCount, newResults, elapsedMs: elapsedMs() });
@@ -96,7 +107,8 @@ export async function runUnifiedSearch(
 
   try {
     await step(options.endpoint, "POST", JSON.stringify(options.body));
-    while (httpStatus === 200 && !failure && !timedOut && status !== "complete" && sessionId) {
+    const stable = () => options.stablePolls > 0 && resultCount > 0 && unchangedPolls >= options.stablePolls;
+    while (httpStatus === 200 && !failure && !timedOut && status !== "complete" && sessionId && !stable()) {
       if (elapsedMs() + options.pollIntervalMs > options.deadlineMs) {
         timedOut = true;
         break;
@@ -114,6 +126,7 @@ export async function runUnifiedSearch(
     failure,
     complete: !timedOut && status === "complete",
     timedOut,
+    stable: status !== "complete" && options.stablePolls > 0 && resultCount > 0 && unchangedPolls >= options.stablePolls,
     upstreamRequests,
     elapsedMs: elapsedMs(),
     firstResultsMs,

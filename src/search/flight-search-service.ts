@@ -46,6 +46,10 @@ export interface FlightSearch {
 }
 
 const POLL_INTERVAL_MS = 600;
+/** Skyscanner answers a poll in ~1-2 s; a request hanging past this is a dead proxy connection. */
+const REQUEST_TIMEOUT_MS = 6_000;
+/** With STOP_WHEN_STABLE, stop after this many polls in a row add no itineraries. */
+const STABLE_POLLS = 2;
 const ROUTE_LOOKUP_TIMEOUT_MS = 10_000;
 const ROUTE_CACHE_LIMIT = 10_000;
 /** One retry on a fresh session after a block; more mostly burns proxy bandwidth. */
@@ -112,7 +116,7 @@ export class FlightSearchService implements FlightSearch {
 
     const outcome = await this.runUnifiedSearch(session, parsedUrl.query, route, request, log);
     const { counts, itineraries } = rankItineraries(outcome.payloadJson, request.sort, request.maxItems, this.pool.origin);
-    const stoppedBy = outcome.complete ? "complete" : outcome.timedOut ? "deadline reached" : "partial";
+    const stoppedBy = outcome.complete ? "complete" : outcome.timedOut ? "deadline reached" : outcome.stable ? "stable" : "partial";
     log.info(
       `${stoppedBy} · ${counts.passed}/${counts.received} flights parsed in ${outcome.upstreamRequests} request${outcome.upstreamRequests === 1 ? "" : "s"} · search ${formatDuration(outcome.elapsedMs)}` +
         (outcome.firstResultsMs === null ? "" : `, first results ${formatDuration(outcome.firstResultsMs)}`),
@@ -183,6 +187,8 @@ export class FlightSearchService implements FlightSearch {
         body: buildUnifiedSearchBody(query, route),
         deadlineMs: searchDeadlineMs,
         pollIntervalMs: POLL_INTERVAL_MS,
+        requestTimeoutMs: REQUEST_TIMEOUT_MS,
+        stablePolls: this.config.stopWhenStable ? STABLE_POLLS : 0,
       },
       ({ step, status, resultCount, newResults }) => {
         const label = step === 1 ? "search created" : `poll ${step}`;
