@@ -3,9 +3,8 @@
 An HTTP service that takes a Skyscanner flight search URL and returns its itineraries as sorted JSON.
 
 ```bash
-curl -G localhost:8000/url \
-  --data-urlencode 'url=https://www.skyscanner.co.in/transport/flights/blr/del/261223/?adultsv2=1&cabinclass=economy' \
-  -d max=10 -d sort=cheapest
+curl localhost:8000/url -H 'content-type: application/json' \
+  -d '{"url":"https://www.skyscanner.co.in/transport/flights/blr/del/261223/?adultsv2=1&cabinclass=economy","max":10,"sort":"cheapest"}'
 ```
 
 It calls Skyscanner's own search API (`web-unified-search`), not the HTML. The calls are made with `fetch()` inside
@@ -54,9 +53,8 @@ A Chrome window opens: that is the browser session, so leave it open. When the l
 `first browser session ready, accepting searches`, run a search:
 
 ```bash
-curl -s -G localhost:8000/url \
-  --data-urlencode 'url=https://www.skyscanner.co.in/transport/flights/bom/goi/261219/?adultsv2=1&cabinclass=economy' \
-  -d max=10 -d sort=cheapest | jq '.status, .result.count, .result.itineraries[0].priceFormatted'
+curl -s localhost:8000/url -H 'content-type: application/json' \
+  -d '{"url":"https://www.skyscanner.co.in/transport/flights/bom/goi/261219/?adultsv2=1&cabinclass=economy","max":10,"sort":"cheapest"}' | jq '.status, .result.count, .result.itineraries[0].priceFormatted'
 ```
 
 ### Linux server
@@ -90,8 +88,9 @@ Fixed settings, changed in <code>src/config/app-config.ts</code> if ever needed:
 
 ## API
 
-### `GET /url` or `POST /url`
-| Parameter | Default | Meaning |
+### `POST /url`
+Send a JSON body. `GET /url` returns 405.
+| Field | Default | Meaning |
 |---|---|---|
 | `url` | required | Skyscanner flight search URL (`/transport/flights/{from}/{to}/{yymmdd}/[{yymmdd}/]`) |
 | `max` | `50` | Itineraries to return (1–1000) |
@@ -102,13 +101,10 @@ Options read from the search URL: `adultsv2`, `childrenv2` (child ages, e.g. `4|
 (`economy`, `premiumeconomy`, `business`, `first`). Add a second date for a return trip.
 
 ```bash
-# GET
-curl -G localhost:8000/url --data-urlencode 'url=<search url>' -d max=20 -d sort=fastest -d fast=true
-# POST
 curl localhost:8000/url -H 'content-type: application/json' \
-  -d '{"url":"<search url>","max":20,"sort":"best"}'
+  -d '{"url":"<search url>","max":20,"sort":"fastest","fast":true}'
 # with API_KEY set
-curl -G localhost:8000/url -H 'x-api-key: <key>' --data-urlencode 'url=<search url>'
+curl localhost:8000/url -H 'content-type: application/json' -H 'x-api-key: <key>' -d '{"url":"<search url>"}'
 ```
 
 Every response, pass or fail, has the same shape. Each one carries an `x-request-id` header that matches its log
@@ -173,7 +169,7 @@ Search lines are tagged with the request id and the time since the request arriv
 17:25:54.791 INFO  [server] listening on http://127.0.0.1:8000 · www.skyscanner.co.in (IN/INR) · pool 1 · output output
 17:25:54.795 INFO  [pool] session 58dad6aa0d23 launching without proxy
 17:26:01.432 INFO  [pool] session 58dad6aa0d23 ready in 6.64s (1/1 ready)
-17:26:06.775 INFO  [req 892d46 +0.00s] GET /url sort=cheapest max=10 url=https://www.skyscanner.co.in/transport/flights/blr/del/261223/?adultsv2=1&cabinclass=economy
+17:26:06.775 INFO  [req 892d46 +0.00s] POST /url sort=cheapest max=10 url=https://www.skyscanner.co.in/transport/flights/blr/del/261223/?adultsv2=1&cabinclass=economy
 17:26:06.778 INFO  [req 892d46 +0.00s] session 58dad6aa0d23 acquired
 17:26:07.190 INFO  [req 892d46 +0.41s] url fetched · route blr=95673351 → del=95673498 in 412ms
 17:26:08.306 INFO  [req 892d46 +1.53s] search created · found 10 flights · incomplete
@@ -245,7 +241,7 @@ src/
 │   ├── index.ts                     createRoutes: the route table (add /details here later)
 │   ├── route-context.ts             RouteContext: search service, pool health, API key, output dir
 │   ├── health.route.ts              GET /health
-│   └── url.route.ts                 GET|POST /url: input validation, response envelope, handler (logging, saving)
+│   └── url.route.ts                 POST /url: input validation, response envelope, handler (logging, saving)
 ├── search/flight-search-service.ts  FlightSearchService: the /url use case, route cache, retry on a fresh session
 ├── sessions/
 │   ├── session-pool.ts              SessionPool: warm-up, least-busy acquire, retire + replace, shutdown
@@ -304,7 +300,7 @@ What each folder and file is for, in the order a `/url` request passes through t
 | `index.ts` | The route table: lists every endpoint and connects it to its handler. Add new endpoints here |
 | `route-context.ts` | `RouteContext`: what handlers can use (search service, pool health, API key, output folder) |
 | `health.route.ts` | `GET /health`: returns the browser pool's state |
-| `url.route.ts` | Everything for `GET` and `POST /url`, in three sections: <br>• **request**: `parseSearchRequest` checks `url`, `max`, `sort` and `fast` and applies defaults (`max=50`, `sort=best`) <br>• **response**: `SearchEnvelope`, `passEnvelope`, `failEnvelope` (`status`, `timeElapsedMs`, `request`, `result`, `failed`) <br>• **handler**: `createUrlRoute` checks `x-api-key`, assigns a request id, runs the search, logs the result and saves the JSON file |
+| `url.route.ts` | Everything for `POST /url`, in three sections: <br>• **request**: `parseSearchRequest` checks `url`, `max`, `sort` and `fast` and applies defaults (`max=50`, `sort=best`) <br>• **response**: `SearchEnvelope`, `passEnvelope`, `failEnvelope` (`status`, `timeElapsedMs`, `request`, `result`, `failed`) <br>• **handler**: `createUrlRoute` checks `x-api-key`, assigns a request id, runs the search, logs the result and saves the JSON file |
 
 ### `src/search/` (the search itself)
 | File | What it does |

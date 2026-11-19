@@ -2,7 +2,7 @@
  * Every HTTP endpoint, in one place. To add one (e.g. `/details`), create
  * `routes/<name>.route.ts` and register it here.
  *
- *   GET|POST /url     search a Skyscanner flight URL → sorted itineraries
+ *   POST /url         search a Skyscanner flight URL → sorted itineraries
  *   GET      /health  browser pool state
  */
 import { createHealthRoute } from "./health.route";

@@ -22,11 +22,12 @@ const baseUrl = `http://localhost:${server.port}`;
 afterAll(() => server.stop());
 
 const SEARCH_URL = "https://www.skyscanner.com/transport/flights/lhr/jfk/261215/";
-const get = (query: string, headers?: HeadersInit) => fetch(`${baseUrl}/url?${query}`, { headers });
+const post = (body: unknown, headers?: HeadersInit, base = baseUrl) =>
+  fetch(`${base}/url`, { method: "POST", body: JSON.stringify(body), headers });
 
 describe("/url", () => {
-  test("GET with defaults returns a pass envelope", async () => {
-    const response = await get(`url=${encodeURIComponent(SEARCH_URL)}`);
+  test("POST with defaults returns a pass envelope", async () => {
+    const response = await post({ url: SEARCH_URL });
     expect(response.status).toBe(200);
     expect(received.at(-1)).toEqual({ searchUrl: SEARCH_URL, maxItems: 50, sort: "best", fast: false });
     expect(await response.json()).toMatchObject({
@@ -47,7 +48,7 @@ describe("/url", () => {
   });
 
   test("a failed search echoes the options it used, with defaults applied", async () => {
-    const response = await get(`url=${encodeURIComponent(SEARCH_URL + "?blocked=1")}`);
+    const response = await post({ url: SEARCH_URL + "?blocked=1" });
     expect(response.status).toBe(502);
     const envelope = await response.json();
     expect(envelope).toMatchObject({
@@ -73,22 +74,29 @@ describe("/url", () => {
   });
 
   test.each([
-    [`max=0&url=${encodeURIComponent(SEARCH_URL)}`, 400],
-    [`sort=random&url=${encodeURIComponent(SEARCH_URL)}`, 400],
-    ["url=https://example.com/", 400],
-    ["", 400],
-  ])("GET ?%s → %d", async (query, status) => {
-    expect((await get(query)).status).toBe(status);
+    [{ url: SEARCH_URL, max: 0 }, 400],
+    [{ url: SEARCH_URL, sort: "random" }, 400],
+    [{ url: "https://example.com/" }, 400],
+    [{}, 400],
+    [[SEARCH_URL], 400],
+  ])("POST %j → %d", async (body, status) => {
+    expect((await post(body)).status).toBe(status);
+  });
+
+  test("GET is not allowed", async () => {
+    const response = await fetch(`${baseUrl}/url?url=${encodeURIComponent(SEARCH_URL)}`);
+    expect(response.status).toBe(405);
+    expect(response.headers.get("allow")).toBe("POST");
   });
 
   test("requires x-api-key when configured", async () => {
     const locked = createHttpServer(fakeSearch, () => ({}), { port: 0, apiKey: "secret" });
-    const url = `http://localhost:${locked.port}/url?url=${encodeURIComponent(SEARCH_URL)}`;
+    const base = `http://localhost:${locked.port}`;
     try {
-      const denied = await fetch(url);
+      const denied = await post({ url: SEARCH_URL }, {}, base);
       expect(denied.status).toBe(401);
       expect((await denied.json()).failed.code).toBe("unauthorized");
-      expect((await fetch(url, { headers: { "x-api-key": "secret" } })).status).toBe(200);
+      expect((await post({ url: SEARCH_URL }, { "x-api-key": "secret" }, base)).status).toBe(200);
     } finally {
       locked.stop();
     }
@@ -98,7 +106,7 @@ describe("/url", () => {
     const outputDir = await mkdtemp(join(tmpdir(), "http-output-"));
     const saving = createHttpServer(fakeSearch, () => ({}), { port: 0, outputDir });
     try {
-      const response = await fetch(`http://localhost:${saving.port}/url?url=${encodeURIComponent(SEARCH_URL)}`);
+      const response = await post({ url: SEARCH_URL }, {}, `http://localhost:${saving.port}`);
       const requestId = response.headers.get("x-request-id");
       expect(requestId).toMatch(/^[0-9a-f]{6}$/);
       const [file] = await readdir(outputDir);

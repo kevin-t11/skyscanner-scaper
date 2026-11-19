@@ -1,7 +1,7 @@
 # Skyscanner scraper: design
 
 ## Goal
-`GET /url?url=<skyscanner search URL>&max=50&sort=cheapest|best|fastest` returns normalized itineraries as JSON,
+`POST /url {"url": "<skyscanner search URL>", "max": 50, "sort": "cheapest|best|fastest"}` returns normalized itineraries as JSON,
 as fast and as cheaply as possible.
 
 ## What we know (verified 2026-11-19)

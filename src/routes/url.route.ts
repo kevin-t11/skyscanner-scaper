@@ -1,5 +1,5 @@
 /**
- * `GET|POST /url`, in one file:
+ * `POST /url` (JSON body), in one file:
  *   1. request:  `parseSearchRequest` validates url / max / sort / fast and applies defaults
  *   2. response: `SearchEnvelope` with `passEnvelope` / `failEnvelope`
  *   3. handler:  `createUrlRoute` checks the API key, runs the search, logs each step, saves the JSON
@@ -207,10 +207,10 @@ export function createUrlRoute({ search, apiKey, outputDir }: RouteContext) {
     return envelopeResponse(envelope, requestId, code);
   }
 
-  async function handleSearch(method: string, input: RawSearchInput): Promise<Response> {
+  async function handleSearch(input: RawSearchInput): Promise<Response> {
     const requestId = newRequestId();
     const log = createLogger(`req ${requestId}`, { timed: true });
-    log.info(`${method} /url ${describeInput(input)}`);
+    log.info(`POST /url ${describeInput(input)}`);
     let request: FlightSearchRequest | undefined;
     try {
       request = parseSearchRequest(input);
@@ -233,11 +233,8 @@ export function createUrlRoute({ search, apiKey, outputDir }: RouteContext) {
   }
 
   return {
-    GET(req: Request): Promise<Response> | Response {
-      const input = Object.fromEntries(new URL(req.url).searchParams);
-      if (!isAuthorized(req)) return rejectInput(input, "unauthorized", "missing or invalid x-api-key");
-      return handleSearch("GET", input);
-    },
+    GET: (): Response =>
+      Response.json({ error: "use POST /url with a JSON body" }, { status: 405, headers: { allow: "POST" } }),
     async POST(req: Request): Promise<Response> {
       // Check the key before reading the body, so unauthenticated callers cannot make us parse it.
       if (!isAuthorized(req)) return rejectInput({}, "unauthorized", "missing or invalid x-api-key");
@@ -245,7 +242,7 @@ export function createUrlRoute({ search, apiKey, outputDir }: RouteContext) {
       if (!body || typeof body !== "object" || Array.isArray(body)) {
         return rejectInput({}, "invalid_request", "body must be a JSON object");
       }
-      return handleSearch("POST", body as RawSearchInput);
+      return handleSearch(body as RawSearchInput);
     },
   };
 }
