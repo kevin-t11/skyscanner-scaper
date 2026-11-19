@@ -6,7 +6,7 @@ import { setLogLevel } from "../../src/logging/logger";
 
 setLogLevel("error");
 import { SessionBlockedError } from "../../src/errors";
-import { createHttpServer } from "../../src/http/http-server";
+import { createHttpServer } from "../../src/server";
 import type { FlightSearch, FlightSearchRequest, FlightSearchResult } from "../../src/search/flight-search-service";
 
 const received: FlightSearchRequest[] = [];

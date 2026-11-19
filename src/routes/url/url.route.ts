@@ -1,24 +1,16 @@
-/** HTTP layer: authentication, input validation, logging, saving output, and mapping results/errors to the envelope. */
+/** `GET|POST /url`: authenticate, validate, run the search, log each step, save the response, map errors to `failed.code`. */
 import {
   InvalidSearchUrlError,
   NoSessionAvailableError,
   SessionBlockedError,
   UpstreamError,
-} from "../errors";
-import { createLogger, formatDuration, type Logger } from "../logging/logger";
-import { saveSearchOutput } from "../output/search-output-writer";
-import type { FlightSearch, FlightSearchRequest } from "../search/flight-search-service";
-import { failEnvelope, passEnvelope, type FailureCode, type SearchEnvelope } from "./search-envelope";
-import { InvalidRequestError, parseSearchRequest, type RawSearchInput } from "./search-request";
-
-export interface HttpServerOptions {
-  port: number;
-  hostname?: string;
-  /** When set, `/url` requires `x-api-key: <apiKey>`. */
-  apiKey?: string;
-  /** When set, every `/url` search response is also saved there as a JSON file. */
-  outputDir?: string;
-}
+} from "../../errors";
+import { createLogger, formatDuration, type Logger } from "../../logging/logger";
+import { saveSearchOutput } from "../../output/search-output-writer";
+import type { FlightSearchRequest } from "../../search/flight-search-service";
+import type { RouteContext } from "../route-context";
+import { failEnvelope, passEnvelope, type FailureCode, type SearchEnvelope } from "./url-response";
+import { InvalidRequestError, parseSearchRequest, type RawSearchInput } from "./url-request";
 
 const HTTP_STATUS: Record<FailureCode, number> = {
   invalid_request: 400,
@@ -65,14 +57,14 @@ function logOutcome(log: Logger, envelope: SearchEnvelope): void {
   }
 }
 
-export function createHttpServer(search: FlightSearch, poolHealth: () => unknown, options: HttpServerOptions) {
-  const isAuthorized = (req: Request) => !options.apiKey || req.headers.get("x-api-key") === options.apiKey;
+export function createUrlRoute({ search, apiKey, outputDir }: RouteContext) {
+  const isAuthorized = (req: Request) => !apiKey || req.headers.get("x-api-key") === apiKey;
 
   async function finish(envelope: SearchEnvelope, requestId: string, log: Logger, code?: FailureCode): Promise<Response> {
     logOutcome(log, envelope);
-    if (options.outputDir) {
+    if (outputDir) {
       try {
-        log.info(`saved ${await saveSearchOutput(options.outputDir, envelope, requestId)}`);
+        log.info(`saved ${await saveSearchOutput(outputDir, envelope, requestId)}`);
       } catch (error) {
         log.warn(`could not save output: ${(error as Error).message}`);
       }
@@ -105,30 +97,20 @@ export function createHttpServer(search: FlightSearch, poolHealth: () => unknown
     return envelopeResponse(failEnvelope({ code, message }, 0, { input }), requestId, code);
   }
 
-  return Bun.serve({
-    port: options.port,
-    hostname: options.hostname,
-    // Complete searches take up to SEARCH_DEADLINE_MS; Bun's default idle timeout is 10 s.
-    idleTimeout: 60,
-    routes: {
-      "/health": () => Response.json(poolHealth()),
-      "/url": {
-        GET: (req) => {
-          const input = Object.fromEntries(new URL(req.url).searchParams);
-          if (!isAuthorized(req)) return rejectInput(input, "unauthorized", "missing or invalid x-api-key");
-          return handleSearch("GET", input);
-        },
-        POST: async (req) => {
-          // Check the key before reading the body, so unauthenticated callers cannot make us parse it.
-          if (!isAuthorized(req)) return rejectInput({}, "unauthorized", "missing or invalid x-api-key");
-          const body: unknown = await req.json().catch(() => null);
-          if (!body || typeof body !== "object" || Array.isArray(body)) {
-            return rejectInput({}, "invalid_request", "body must be a JSON object");
-          }
-          return handleSearch("POST", body as RawSearchInput);
-        },
-      },
+  return {
+    GET(req: Request): Promise<Response> | Response {
+      const input = Object.fromEntries(new URL(req.url).searchParams);
+      if (!isAuthorized(req)) return rejectInput(input, "unauthorized", "missing or invalid x-api-key");
+      return handleSearch("GET", input);
     },
-    fetch: () => Response.json({ error: "not found" }, { status: 404 }),
-  });
+    async POST(req: Request): Promise<Response> {
+      // Check the key before reading the body, so unauthenticated callers cannot make us parse it.
+      if (!isAuthorized(req)) return rejectInput({}, "unauthorized", "missing or invalid x-api-key");
+      const body: unknown = await req.json().catch(() => null);
+      if (!body || typeof body !== "object" || Array.isArray(body)) {
+        return rejectInput({}, "invalid_request", "body must be a JSON object");
+      }
+      return handleSearch("POST", body as RawSearchInput);
+    },
+  };
 }

@@ -1,8 +1,8 @@
 /** The response envelope every `/url` call returns, on success and on failure. */
-import type { FlightSearchRequest, FlightSearchResult, SearchTimings } from "../search/flight-search-service";
-import type { Itinerary } from "../skyscanner/itinerary";
-import type { FlightSearchQuery } from "../skyscanner/search-url";
-import { describeRawInput, type RawSearchInput } from "./search-request";
+import type { FlightSearchRequest, FlightSearchResult, SearchTimings } from "../../search/flight-search-service";
+import type { Itinerary } from "../../skyscanner/itinerary";
+import type { FlightSearchQuery } from "../../skyscanner/search-url";
+import { describeRawInput, type RawSearchInput } from "./url-request";
 
 export type FailureCode = "invalid_request" | "unauthorized" | "no_session" | "blocked" | "upstream_error" | "internal_error";
 

@@ -1,7 +1,7 @@
 /** Validates `/url` input (query string or JSON body) into a `FlightSearchRequest`. */
-import type { FlightSearchRequest } from "../search/flight-search-service";
-import { SORT_ORDERS, type SortOrder } from "../skyscanner/itinerary";
-import { parseSearchUrl } from "../skyscanner/search-url";
+import type { FlightSearchRequest } from "../../search/flight-search-service";
+import { SORT_ORDERS, type SortOrder } from "../../skyscanner/itinerary";
+import { parseSearchUrl } from "../../skyscanner/search-url";
 
 export const DEFAULT_MAX_ITEMS = 50;
 export const MAX_ITEMS_LIMIT = 1_000;

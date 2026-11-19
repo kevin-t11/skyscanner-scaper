@@ -236,7 +236,7 @@ PROXY_URL=http://USERNAME:PASSWORD_country-IN_session-{session}_lifetime-30@rp.e
 
 ## Project structure
 ```
-/url → parseSearchRequest → FlightSearchService.search
+routes/url → parseSearchRequest → FlightSearchService.search
          → SessionPool.acquire (least-busy warmed Chrome) → resolveRoute (airport ids, cached)
          → runUnifiedSearch (create + poll, one in-page fetch per step, logged) → rankItineraries
          → SearchEnvelope → saved to OUTPUT_DIR
@@ -245,14 +245,19 @@ PROXY_URL=http://USERNAME:PASSWORD_country-IN_session-{session}_lifetime-30@rp.e
 ```
 src/
 ├── main.ts                          entry point: config → logger → pool → HTTP server
+├── server.ts                        HTTP bootstrap only: Bun.serve + routes
 ├── errors.ts                        domain errors, mapped to failed.code
 ├── config/app-config.ts             AppConfig, loadAppConfig (env)
 ├── logging/logger.ts                createLogger: compact, timed, leveled log lines
 ├── output/search-output-writer.ts   saveSearchOutput: one JSON file per search
-├── http/
-│   ├── http-server.ts               routes, API key, request id, logging, error → envelope
-│   ├── search-request.ts            parseSearchRequest: validates url / max / sort / fast
-│   └── search-envelope.ts           SearchEnvelope, passEnvelope, failEnvelope
+├── routes/                          every endpoint lives here, one file or folder per route
+│   ├── index.ts                     createRoutes: the route table (add /details here later)
+│   ├── route-context.ts             RouteContext: search service, pool health, API key, output dir
+│   ├── health.route.ts              GET /health
+│   └── url/
+│       ├── url.route.ts             GET|POST /url: API key, request id, logging, saving, error → envelope
+│       ├── url-request.ts           parseSearchRequest: validates url / max / sort / fast
+│       └── url-response.ts          SearchEnvelope, passEnvelope, failEnvelope
 ├── search/flight-search-service.ts  FlightSearchService: the /url use case, route cache, retry on a fresh session
 ├── sessions/
 │   ├── session-pool.ts              SessionPool: warm-up, least-busy acquire, retire + replace, shutdown
