@@ -44,7 +44,7 @@ export interface FlightSearch {
   search(request: FlightSearchRequest, log?: Logger): Promise<FlightSearchResult>;
 }
 
-const POLL_INTERVAL_MS = 600;
+const POLL_INTERVAL_MS = 200;
 const ROUTE_LOOKUP_TIMEOUT_MS = 10_000;
 const ROUTE_CACHE_LIMIT = 10_000;
 /** One retry on a fresh session after a block; more mostly burns proxy bandwidth. */

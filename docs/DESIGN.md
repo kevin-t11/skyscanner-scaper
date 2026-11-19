@@ -43,7 +43,7 @@ SearchService ── parse URL ─► entity cache (LRU)  ─miss─► in-page 
 SessionPool (N workers, least-busy)          one worker = 1 headless Chrome + 1 tab + 1 sticky proxy IP
         │                                     warm-up: open home page once → PX sensor sets _px3
         ▼                                     health: 403/captcha → retire, relaunch with a new proxy session
-in-page fetch(): create → poll (adaptive 250ms→1s) → stop at complete | deadline
+in-page fetch(): create → poll (200 ms pause between polls) → stop at complete | deadline
         │
         ▼
 parse + sort (Skyscanner sortingOptions if present, else cheapest/fastest/best) → slice(max) → JSON
@@ -70,7 +70,7 @@ Why each choice:
 | `complete` (all agents answered) | 8–12 s; capped by the 12 s search deadline (`SEARCH_DEADLINE_MS` in `src/config/app-config.ts`) |
 
 ## Cost (estimate)
-- A full poll for 943 itineraries is ~490 KB gzip on the wire; early polls are smaller. With the 600 ms poll interval a
+- A full poll for 943 itineraries is ~490 KB gzip on the wire; early polls are smaller. With the 200 ms poll interval a
   complete search is roughly 1–4 MB, so **~$0.5–2 per 1,000 complete searches** at Evomi's $0.49/GB.
 - Session warm-up is ~0.3–0.8 MB (images, fonts and media blocked; `*.skyscnr.com` CDN bypasses the proxy).
 - Apify actors charge ~$1 per 1,000 *itineraries*; one complete search here returns 75–940 itineraries.
