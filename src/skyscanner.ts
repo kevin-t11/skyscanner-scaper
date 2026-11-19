@@ -75,7 +75,7 @@ export interface PageResolveResult {
  * `window.__internal` already contains the resolved entity ids.
  */
 export async function pageResolve(path: string): Promise<PageResolveResult> {
-  const response = await fetch(path, { credentials: "include" });
+  const response = await fetch(path, { credentials: "include", signal: AbortSignal.timeout(10_000) });
   const html = await response.text();
   const pick = (pattern: RegExp) => html.match(pattern)?.[1];
   return {
@@ -151,7 +151,10 @@ export async function pageSearch(args: PageSearchArgs): Promise<PageSearchResult
   let httpStatus = await call(args.endpoint, { method: "POST", body: JSON.stringify(args.body) });
   while (httpStatus === 200 && !timedOut && context.status !== "complete" && context.sessionId) {
     if (args.fast && results.size >= args.want) break;
-    if (performance.now() - started + args.pollIntervalMs > args.deadlineMs) break;
+    if (performance.now() - started + args.pollIntervalMs > args.deadlineMs) {
+      timedOut = true;
+      break;
+    }
     await new Promise((resolve) => setTimeout(resolve, args.pollIntervalMs));
     httpStatus = await call(args.endpoint + encodeURIComponent(context.sessionId), { method: "GET" });
   }
