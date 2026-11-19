@@ -3,9 +3,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-PORT="$(sed -nE 's/^PORT=([0-9]+).*/\1/p' .env | tail -1)"
+# Read .env with the app's own parser, so quoting and comments behave exactly as in the server.
+env_value() { "$HOME/.bun/bin/bun" -e "import { readDotEnv } from './src/config/dotenv'; console.log(readDotEnv()['$1'] ?? '')"; }
+PORT="$(env_value PORT)"
 BASE="http://localhost:${PORT:-8000}"
-KEY="$(sed -nE "s/^API_KEY=[\"']?([^\"'[:space:]#]*).*/\1/p" .env | tail -1)"
+KEY="$(env_value API_KEY)"
 SEARCH_URL="${1:-https://www.skyscanner.co.in/transport/flights/bom/blr/$(date -d '+30 days' +%y%m%d)/?adultsv2=1&cabinclass=economy}"
 
 printf 'health  '
