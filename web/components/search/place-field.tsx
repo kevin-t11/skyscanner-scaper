@@ -77,6 +77,8 @@ export function PlaceField({ label, direction, value, onChange }: PlaceFieldProp
         }}
         query={query}
         onQueryChange={(next) => {
+          // Closing the list resets the query to "": keep the picked place and show its name again.
+          if (value && !next) return setQuery(value.name);
           setQuery(next);
           if (value && next !== value.name) onChange(null);
         }}
