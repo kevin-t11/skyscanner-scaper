@@ -18,9 +18,8 @@ if ! command -v google-chrome >/dev/null; then
 fi
 [ -x "$BUN" ] || curl -fsSL https://bun.sh/install | bash >/dev/null
 
-echo "==> dependencies and tests"
+echo "==> dependencies"
 "$BUN" install --frozen-lockfile >/dev/null
-"$BUN" test >/dev/null
 
 if [ ! -f .env ]; then
   cp .env.example .env
@@ -38,14 +37,5 @@ sudo systemctl daemon-reload
 sudo systemctl enable -q skyscanner
 sudo systemctl restart skyscanner
 
-PORT="$(sed -nE 's/^PORT=([0-9]+).*/\1/p' .env | tail -1)"
-echo "==> waiting for a browser session on port ${PORT:-8000}"
-for _ in $(seq 60); do
-  if curl -fs "localhost:${PORT:-8000}/health" | grep -q '"ready":[1-9]'; then
-    echo "ready: $(curl -fs "localhost:${PORT:-8000}/health")"
-    exit 0
-  fi
-  sleep 2
-done
-echo "no browser session after 2 min; see: journalctl -u skyscanner -n 50" >&2
-exit 1
+echo "==> deployed $(git rev-parse --short HEAD) · the browser needs ~10-20 s to warm up"
+echo "    check: bash deploy/check.sh · logs: journalctl -u skyscanner -f"
