@@ -5,15 +5,13 @@
  *   GET|POST /url     search a Skyscanner flight URL → sorted itineraries
  *   GET      /health  browser pool state
  */
+import type { FlightSearch } from "../search/flight-search-service";
 import { createHealthRoute } from "./health.route";
-import type { RouteContext } from "./route-context";
-import { createUrlRoute } from "./url/url.route";
+import { createUrlRoute, type UrlRouteOptions } from "./url/url.route";
 
-export type { RouteContext } from "./route-context";
-
-export function createRoutes(context: RouteContext) {
+export function createRoutes(search: FlightSearch, poolHealth: () => unknown, options: UrlRouteOptions = {}) {
   return {
-    "/url": createUrlRoute(context),
-    "/health": createHealthRoute(context),
+    "/url": createUrlRoute(search, options),
+    "/health": createHealthRoute(poolHealth),
   };
 }

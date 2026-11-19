@@ -7,8 +7,7 @@ import {
 } from "../../errors";
 import { createLogger, formatDuration, type Logger } from "../../logging/logger";
 import { saveSearchOutput } from "../../output/search-output-writer";
-import type { FlightSearchRequest } from "../../search/flight-search-service";
-import type { RouteContext } from "../route-context";
+import type { FlightSearch, FlightSearchRequest } from "../../search/flight-search-service";
 import { failEnvelope, passEnvelope, type FailureCode, type SearchEnvelope } from "./url-response";
 import { InvalidRequestError, parseSearchRequest, type RawSearchInput } from "./url-request";
 
@@ -57,7 +56,14 @@ function logOutcome(log: Logger, envelope: SearchEnvelope): void {
   }
 }
 
-export function createUrlRoute({ search, apiKey, outputDir }: RouteContext) {
+export interface UrlRouteOptions {
+  /** When set, `/url` requires `x-api-key: <apiKey>`. */
+  apiKey?: string;
+  /** When set, every search response is also saved there as a JSON file. */
+  outputDir?: string;
+}
+
+export function createUrlRoute(search: FlightSearch, { apiKey, outputDir }: UrlRouteOptions = {}) {
   const isAuthorized = (req: Request) => !apiKey || req.headers.get("x-api-key") === apiKey;
 
   async function finish(envelope: SearchEnvelope, requestId: string, log: Logger, code?: FailureCode): Promise<Response> {
