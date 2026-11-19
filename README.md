@@ -1,6 +1,6 @@
 # Skyscanner flight scraper
 
-An HTTP service that takes a Skyscanner flight search URL and returns its itineraries as sorted JSON.
+An HTTP service that searches Skyscanner flights by fields (`POST /search`) or by search URL (`POST /url`) and returns the itineraries as sorted JSON.
 
 ```bash
 curl localhost:8000/url -H 'content-type: application/json' \
@@ -76,7 +76,7 @@ Only these, and only from the `.env` file in the project folder (shell or system
 | `PROXY_URL` | none | `http://user:pass@host:port` or `host:port:user:pass`; `{session}` is replaced per browser so each one keeps a sticky IP |
 | `PORT` | `8000` | HTTP port; the server listens on `localhost` only |
 | `POOL_SIZE` | `1` | Browser sessions (one IP and ~300–700 MB RAM each); raise it for parallel searches |
-| `API_KEY` | none | When set, `/url` requires the `x-api-key` header |
+| `API_KEY` | none | When set, `/search`, `/url` and `/places` require the `x-api-key` header |
 | `LOGGING` | `enabled` | `enabled` prints the server logs; `disabled` turns them all off |
 | `STOP_WHEN_STABLE` | `enabled` | Return after the first poll that adds no flights (`complete: false`, usually 2–4 s sooner); `disabled` waits for Skyscanner's `complete` |
 | `CHROME_PATH` | found automatically | Only needed if Chrome is installed somewhere unusual |
@@ -88,6 +88,34 @@ Fixed settings, changed in <code>src/config/app-config.ts</code> if ever needed:
 - **Browser:** headful Chrome, because the search API blocks headless Chrome.
 
 ## API
+
+All search endpoints return the same envelope; `x-api-key` is required on `/search`, `/url` and `/places` when `API_KEY` is set.
+
+### `POST /search` (main endpoint)
+```bash
+curl localhost:8000/search -H 'content-type: application/json' \
+  -d '{"from":"Mumbai","to":"Goa","departDate":"2026-12-15","returnDate":"2026-12-22","cabinClass":"economy","adults":1,"max":10,"sort":"cheapest"}'
+```
+| Field | Default | Meaning |
+|---|---|---|
+| `from`, `to` | required | City or airport name or code. A capitalized code matches exactly (`BOM` = Mumbai airport, `NYCA` = New York, all airports); other text takes the top autocomplete match (`mumbai`, `goa`, `new york`) |
+| `departDate` | required | `YYYY-MM-DD` |
+| `returnDate` | none | `YYYY-MM-DD`; omit for one-way |
+| `cabinClass` | `economy` | `economy`, `premium_economy`, `business`, `first` |
+| `adults` | `1` | 1–8 |
+| `max`, `sort` | `50`, `best` | As for `/url` |
+
+The result also has `places` (what `from` / `to` resolved to) and `searchUrl` (the same search on the website).
+Unknown places return `400 invalid_request: no airport or city matches "…"`.
+
+### `GET /places?q=mumb&type=from`
+Autocomplete for the From (`type=from`, default) or To (`type=to`) box:
+```json
+{"query":"mumb","type":"from","places":[
+  {"name":"Mumbai","code":"IBOM","iata":"BOM","type":"city","entityId":"27539520","city":"Mumbai","country":"India"},
+  {"name":"Mumbai","code":"BOM","iata":"BOM","type":"airport","entityId":"95673320","city":"Mumbai","country":"India"}]}
+```
+Pass a place's `code` as `from` / `to` in `/search` to pick it exactly.
 
 ### `POST /url`
 Send a JSON body. `GET /url` returns 405.
@@ -208,7 +236,7 @@ To keep logs in a file: `bun start 2>&1 | tee -a logs/server.log`. To turn logs 
 Output files are still saved when logging is off.
 
 ## Output files
-Every `/url` search response is saved to `output/` (git ignores it), named
+Every `/search` and `/url` response is saved to `output/` (git ignores it), named
 `{date-time}_{from}-{to}_{sort}_{pass|fail}_{request id}.json`, for example
 `output/20261119-172614_blr-del_cheapest_pass_892d46.json`. The file contains exactly the JSON response.
 Requests rejected before a search starts (wrong API key, a body that isn't JSON) are logged but not saved.
@@ -250,41 +278,29 @@ Updates: `git pull && bash deploy/install.sh && bash deploy/check.sh`. Full guid
 
 ## Project structure
 ```
-routes/url → parseSearchRequest → FlightSearchService.search
-         → SessionPool.acquire (least-busy warmed Chrome) → resolveRoute (airport ids, cached)
-         → runUnifiedSearch (create + poll, one in-page fetch per step, logged) → rankItineraries
-         → SearchEnvelope → saved to output/
+POST /search ─┐                         GET /places
+POST /url    ─┴→ routes/ (validate, envelope, log, save)      │
+               → services/flight-search.service.ts ←──────────┘
+                   places (autocomplete, cached) → entity ids
+                   → sessions/session-pool (warm headful Chrome, one proxy IP each)
+                   → skyscanner/unified-search-runner (create + poll, in-page fetch)
+                   → parsers/itinerary-normalizer (parse, count, sort, top max)
+               → SearchEnvelope → utils/output-writer → output/
 ```
 
 ```
 src/
-├── main.ts                          entry point: config → logger → pool → HTTP server
-├── server.ts                        HTTP bootstrap only: Bun.serve + routes
-├── errors.ts                        domain errors, mapped to failed.code
-├── config/app-config.ts             AppConfig, loadAppConfig (env)
-├── logging/logger.ts                createLogger: compact, timed, leveled log lines
-├── output/search-output-writer.ts   saveSearchOutput: one JSON file per search
-├── routes/                          every endpoint lives here, one file per route
-│   ├── index.ts                     createRoutes: the route table (add /details here later)
-│   ├── route-context.ts             RouteContext: search service, pool health, API key, output dir
-│   ├── health.route.ts              GET /health
-│   └── url.route.ts                 POST /url: input validation, response envelope, handler (logging, saving)
-├── search/flight-search-service.ts  FlightSearchService: the /url use case, route cache, retry on a fresh session
-├── sessions/
-│   ├── session-pool.ts              SessionPool: warm-up, least-busy acquire, retire + replace, shutdown
-│   └── browser-session.ts           BrowserSession: one Chrome + one proxy IP, in-flight tracking
-├── browser/
-│   ├── chrome-browser.ts            ChromeBrowser: launch, navigate, evaluate, resource blocking, proxy auth
-│   ├── cdp-connection.ts            CdpConnection: typed CDP client over one WebSocket
-│   ├── cdp-protocol.ts              typed CDP commands and events used here
-│   └── proxy-settings.ts            parseProxyUrl, proxyForSession ({session} placeholder)
-└── skyscanner/
-    ├── search-url.ts                parseSearchUrl: /transport/flights/... → FlightSearchQuery
-    ├── unified-search-api.ts        API endpoint, request builders, typed API responses (Api*)
-    ├── unified-search-runner.ts     runUnifiedSearch: create/poll loop, deadline, progress callbacks
-    ├── page-scripts.ts              functions that run inside the page (route lookup, one search step)
-    ├── itinerary.ts                 public Itinerary / FlightLeg / BookingOption types
-    └── itinerary-normalizer.ts      normalizeItinerary, rankItineraries (best / cheapest / fastest)
+├── main.ts, server.ts, errors.ts
+├── config/      app-config.ts (settings from .env), dotenv.ts
+├── routes/      search.route.ts, url.route.ts, places.route.ts, health.route.ts, index.ts, route-context.ts
+├── services/    flight-search.service.ts
+├── sessions/    session-pool.ts, browser-session.ts
+├── browser/     chrome-browser.ts, cdp-connection.ts, cdp-protocol.ts, proxy-settings.ts
+├── skyscanner/  unified-search-api.ts, unified-search-runner.ts, places.ts, page-scripts.ts, px-challenge.ts
+├── parsers/     search-url.ts, itinerary-normalizer.ts
+├── types/       itinerary.ts
+└── utils/       logger.ts, output-writer.ts
+deploy/          install.sh, skyscanner.service, check.sh, logs.sh
 ```
 
 ## Development
@@ -299,75 +315,34 @@ HAR of a real search and compare it with `buildUnifiedSearchBody` / `buildUnifie
 `src/skyscanner/unified-search-api.ts`.
 
 ## Folder and file guide
-What each folder and file is for, in the order a `/url` request passes through them.
 
-### Root
-| File | What it does |
-|---|---|
-| `package.json` | Scripts (`start`, `dev`, `typecheck`) and dev dependencies |
-| `bun.lock` | Locked dependency versions |
-| `tsconfig.json` | TypeScript settings (strict mode) |
-| `.env.example` | Every setting with a comment; copy it to `.env` (the only place settings are read from) |
-| `DEPLOYMENT.md` | Lightsail deployment: first install, update, rollback, verification, operations |
-| `deploy/install.sh` | Installs xvfb, Chrome and Bun, creates `.env` on the first run, installs and restarts the `skyscanner` service |
-| `deploy/logs.sh` | Live service logs without systemd's date/host/pid prefix |
-| `deploy/check.sh` | After a deploy: waits for a ready browser, then runs one live search and prints pass/fail |
-| `deploy/skyscanner.service` | systemd unit template used by `install.sh` |
-| `.gitignore` | Keeps `.env`, `node_modules/`, HAR captures and `/output/` out of git |
-| `README.md` | This guide |
-| `docs/DESIGN.md` | Research notes: how Skyscanner's API and PerimeterX work, design choices, measured speed and cost |
-| `output/` | Created at runtime: one saved JSON file per search (ignored by git) |
-
-### `src/` (entry point and HTTP)
-| File | What it does |
-|---|---|
-| `main.ts` | Starts everything: reads config, turns logging on or off, starts the browser pool and the HTTP server, and shuts down cleanly on Ctrl-C or `SIGTERM` |
-| `server.ts` | Starts Bun's HTTP server with the routes from `routes/`, plus a 404 for unknown paths. It contains no endpoint logic |
-| `errors.ts` | Named errors (`InvalidSearchUrlError`, `SessionBlockedError`, `SessionNetworkError`, `UpstreamError`, `BrowserError`, …). The `/url` route turns each one into a `failed.code` |
-
-### `src/routes/` (every endpoint)
-| File | What it does |
-|---|---|
-| `index.ts` | The route table: lists every endpoint and connects it to its handler. Add new endpoints here |
-| `route-context.ts` | `RouteContext`: what handlers can use (search service, pool health, API key, output folder) |
-| `health.route.ts` | `GET /health`: returns the browser pool's state |
-| `url.route.ts` | Everything for `POST /url`, in three sections: <br>• **request**: `parseSearchRequest` checks `url`, `max` and `sort` and applies defaults (`max=50`, `sort=best`) <br>• **response**: `SearchEnvelope`, `passEnvelope`, `failEnvelope` (`status`, `timeElapsedMs`, `request`, `result`, `failed`) <br>• **handler**: `createUrlRoute` checks `x-api-key`, assigns a request id, runs the search, logs the result and saves the JSON file |
-
-### `src/search/` (the search itself)
-| File | What it does |
-|---|---|
-| `flight-search-service.ts` | `FlightSearchService.search`: parses the search URL, takes a browser session, looks up the airport ids (cached per route), runs the search, sorts and trims the results, and logs each step. If a session is blocked or its network fails, the service retires it and retries once on a fresh session |
-
-### `src/sessions/` (browser pool)
-| File | What it does |
-|---|---|
-| `session-pool.ts` | `SessionPool`: starts `POOL_SIZE` Chrome sessions and warms each one up on the Skyscanner home page. Each search gets the least busy ready session. A blocked or broken session is replaced with a new proxy IP, with back-off between failed launches. `health()` reports the pool's state |
-| `browser-session.ts` | `BrowserSession`: one Chrome with one sticky proxy IP. It tracks searches in progress and requests made, and closes only once its last search ends |
-
-### `src/browser/` (Chrome control)
-| File | What it does |
-|---|---|
-| `chrome-browser.ts` | `ChromeBrowser`: launches Chrome with a temporary profile and controls it over the DevTools protocol (CDP), without Playwright. Its jobs: <br>• block images, fonts and media <br>• answer the proxy's login <br>• `navigate` to pages <br>• `evaluate` scripts inside the page <br>• clean up the profile on close |
-| `cdp-connection.ts` | `CdpConnection`: typed client for Chrome's DevTools WebSocket (commands, events, timeouts, closed-connection detection) |
-| `cdp-protocol.ts` | Types for the DevTools commands and events this project uses, so `send()` is checked by TypeScript |
-| `proxy-settings.ts` | `parseProxyUrl` splits `PROXY_URL` into server, username and password. `proxyForSession` fills in `{session}` so each browser keeps its own sticky IP |
-
-### `src/skyscanner/` (Skyscanner-specific)
-| File | What it does |
-|---|---|
-| `search-url.ts` | `parseSearchUrl`: turns `/transport/flights/{from}/{to}/{yymmdd}/…?adultsv2&childrenv2&cabinclass` into a `FlightSearchQuery`; impossible dates are rejected |
-| `unified-search-api.ts` | Skyscanner's search API: the endpoint, `buildUnifiedSearchBody` / `buildUnifiedSearchHeaders`, and typed API responses (`ApiItinerary`, `ApiLeg`, …) |
-| `px-challenge.ts` | `solvePressAndHold`: when PerimeterX shows its "Press & Hold" page, moves the mouse to the button, holds it ~10 s with small jitter and releases (same method as the Zillow scraper). A session is replaced only if this fails |
-| `unified-search-runner.ts` | `runUnifiedSearch`: the create-then-poll loop. It waits for `complete` within the deadline, reports progress after each request (the `poll N` log lines), and reports blocks, network errors and bad responses |
-| `page-scripts.ts` | Functions that run inside the Skyscanner page, so requests use the browser's cookies: <br>• airport-id lookup from the search page <br>• one create or poll request, with results merged by id <br>• collecting the merged results |
-| `itinerary.ts` | The public result types: `Itinerary`, `FlightLeg`, `FlightSegment`, `BookingOption`, `SortOrder` |
-| `itinerary-normalizer.ts` | `normalizeItinerary` turns Skyscanner's raw itineraries into `Itinerary` objects. `rankItineraries` drops unpriced ones, sorts by `best`, `cheapest` or `fastest`, and keeps `max` |
-
-### `src/config/`, `src/logging/`, `src/output/`
-| File | What it does |
-|---|---|
-| `config/app-config.ts` | `loadAppConfig`: reads the few settings from `.env` and holds the fixed settings (site, deadline, output folder, Chrome lookup) |
-| `config/dotenv.ts` | `readDotEnv`: parses `.env` (comments, inline comments, quotes); the only settings source |
-| `logging/logger.ts` | `createLogger`: compact log lines (`time LEVEL [scope +elapsed] message`), the `LOGGING` switch, and escaping so input can't forge log lines |
-| `output/search-output-writer.ts` | `saveSearchOutput`: writes each response to `output/` as `{time}_{from}-{to}_{sort}_{pass\|fail}_{id}.json` |
-
+| Folder | File | What it does |
+|---|---|---|
+| `src/` | `main.ts` | Entry point: loads `.env` settings, starts the browser pool and the HTTP server, shuts down cleanly |
+| | `server.ts` | `Bun.serve` on `127.0.0.1:PORT` with the route table |
+| | `errors.ts` | Domain errors (`InvalidSearchUrlError`, `PlaceNotFoundError`, `SessionBlockedError`, …) mapped to failure codes |
+| `config/` | `app-config.ts` | `loadAppConfig`: `PROXY_URL`, `PORT`, `POOL_SIZE`, `API_KEY`, `LOGGING`, `STOP_WHEN_STABLE`, `CHROME_PATH`; fixed site settings (co.in, IN, INR) |
+| | `dotenv.ts` | Reads `.env`, the only settings source |
+| `routes/` | `index.ts` | Route table: `/search`, `/url`, `/places`, `/health` |
+| | `search.route.ts` | `POST /search`: validates `from`, `to`, dates, `cabinClass`, `adults` |
+| | `url.route.ts` | `POST /url`, plus the shared flight-search handler: envelope, API key, logging, saving |
+| | `places.route.ts` | `GET /places`: autocomplete |
+| | `health.route.ts` | `GET /health`: pool state; 200 while a browser is live, else 503 |
+| | `route-context.ts` | What every handler receives (service, pool health, API key, output folder) |
+| `services/` | `flight-search.service.ts` | The use case: resolve places (cached), take a session, run the search, rank; retry once on a fresh session; challenge strategy |
+| `sessions/` | `session-pool.ts` | Keeps `POOL_SIZE` warm browsers; replaces blocked or broken ones; health counters |
+| | `browser-session.ts` | One browser with its state and request counters |
+| `browser/` | `chrome-browser.ts` | Launches Chrome and drives it over CDP: stealth settings, proxy login, blocks images/fonts/media |
+| | `cdp-connection.ts`, `cdp-protocol.ts` | Minimal typed Chrome DevTools Protocol client |
+| | `proxy-settings.ts` | Parses `PROXY_URL`, fills `{session}` per browser |
+| `skyscanner/` | `unified-search-api.ts` | Request/response models and builders for the flight search API |
+| | `unified-search-runner.ts` | Create-then-poll loop: deadline, stable stop, failure classification |
+| | `places.ts` | Autocomplete API: in-page call, `Place` model, `pickPlace` matching |
+| | `page-scripts.ts` | Functions that run inside the page (search steps, search-page fallback lookup) |
+| | `px-challenge.ts` | "Press & Hold" challenge solver |
+| `parsers/` | `search-url.ts` | `parseSearchUrl` (URL → query) and `buildSearchUrl` (query → website URL) |
+| | `itinerary-normalizer.ts` | Raw itineraries → `Itinerary`; counts; sorting; top `max` |
+| `types/` | `itinerary.ts` | Public result types: `Itinerary`, `FlightLeg`, `BookingOption`, `SortOrder` |
+| `utils/` | `logger.ts` | Compact timed log lines, `LOGGING` switch |
+| | `output-writer.ts` | Saves each search response to `output/` |
+| `deploy/` | `install.sh`, `skyscanner.service`, `check.sh`, `logs.sh` | Server install/restart, systemd unit, post-deploy check, compact logs (see DEPLOYMENT.md) |
