@@ -82,6 +82,11 @@ export class SessionPool {
    * Runs `work` with the session's page to itself: only when no search is using it, and no new
    * search gets it until `work` ends. Returns false when the session is busy or `work` fails; then the caller must retire it.
    */
+  /** True when another warm session could take a search right away (retrying there beats solving). */
+  hasOtherReadySession(session: BrowserSession): boolean {
+    return [...this.sessions].some((other) => other !== session && other.isUsable);
+  }
+
   async runExclusive(session: BrowserSession, work: (browser: ChromeBrowser) => Promise<boolean>): Promise<boolean> {
     if (!session.isUsable || session.inflight > 0) return false;
     session.state = "exclusive";
