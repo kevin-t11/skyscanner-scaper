@@ -156,7 +156,19 @@ lines and output file.
 | 500 | `internal_error` | Unexpected error (details in the server log) |
 
 ### `GET /health`
-Pool state: ready and warming sessions, launches, retirements, and requests made by each session.
+Same shape as the Zillow scraper's: HTTP 200 while at least one browser is ready, 503 otherwise.
+
+```json
+{
+  "status": "ok",                  // ok | warming | no-browsers
+  "size": 1, "live": 1, "warming": 0,
+  "launched": 1, "retired": 0, "launch_errors": 0,
+  "last_error": null,              // last launch failure or retirement reason
+  "oldest_session_age_s": 312.4,
+  "last_success_at": "2026-11-19T15:20:41.512Z",
+  "proxy": true
+}
+```
 
 ## Logs
 The server prints one compact line per step to stdout (warnings and errors go to stderr):

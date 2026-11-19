@@ -15,14 +15,21 @@ const LAUNCH_RETRY_BACKOFF_MS = [1_000, 5_000, 15_000, 60_000];
 const DEFAULT_ACQUIRE_TIMEOUT_MS = 30_000;
 const log = createLogger("pool");
 
+/** `GET /health` body, shaped like the Zillow scraper's: a status plus pool counters. */
 export interface PoolHealth {
-  ready: number;
-  warming: number;
+  /** `ok`: a browser is ready · `warming`: one is starting · `no-browsers`: none is ready or starting. */
+  status: "ok" | "warming" | "no-browsers";
   size: number;
+  live: number;
+  warming: number;
   launched: number;
   retired: number;
-  launchErrors: number;
-  sessions: { id: string; inflight: number; upstreamRequests: number; ageSeconds: number }[];
+  launch_errors: number;
+  last_error: string | null;
+  oldest_session_age_s: number | null;
+  /** ISO time of the last search that passed. */
+  last_success_at: string | null;
+  proxy: boolean;
 }
 
 export class SessionPool {
@@ -34,6 +41,7 @@ export class SessionPool {
   private readonly shutdown = new AbortController();
   private consecutiveLaunchFailures = 0;
   private readonly counters = { launched: 0, retired: 0, launchErrors: 0 };
+  private lastError: string | null = null;
 
   constructor(private readonly config: AppConfig) {}
 
@@ -90,18 +98,29 @@ export class SessionPool {
     if (!this.sessions.delete(session)) return;
     session.retire();
     this.counters.retired++;
+    this.lastError = `session retired: ${reason}`;
     log.warn(`session ${session.id} retired after ${session.upstreamRequests} requests: ${reason}`);
     if (!this.stopped) this.launchInBackground();
   }
 
   health(): PoolHealth {
-    const sessions = [...this.sessions].map((session) => ({
-      id: session.id,
-      inflight: session.inflight,
-      upstreamRequests: session.upstreamRequests,
-      ageSeconds: Math.round((Date.now() - session.startedAt) / 1000),
-    }));
-    return { ready: sessions.length, warming: this.warmingBrowsers.size, size: this.config.poolSize, ...this.counters, sessions };
+    const sessions = [...this.sessions];
+    const warming = this.warmingBrowsers.size;
+    const oldestStartedAt = Math.min(...sessions.map((session) => session.startedAt));
+    const lastSuccessAt = Math.max(0, ...sessions.map((session) => session.lastSuccessAt ?? 0));
+    return {
+      status: sessions.length ? "ok" : warming ? "warming" : "no-browsers",
+      size: this.config.poolSize,
+      live: sessions.length,
+      warming,
+      launched: this.counters.launched,
+      retired: this.counters.retired,
+      launch_errors: this.counters.launchErrors,
+      last_error: this.lastError,
+      oldest_session_age_s: sessions.length ? Math.round((Date.now() - oldestStartedAt) / 100) / 10 : null,
+      last_success_at: lastSuccessAt ? new Date(lastSuccessAt).toISOString() : null,
+      proxy: Boolean(this.config.proxyUrl),
+    };
   }
 
   async stop(): Promise<void> {
@@ -159,6 +178,7 @@ export class SessionPool {
       if (this.stopped) return;
       this.consecutiveLaunchFailures++;
       this.counters.launchErrors++;
+      this.lastError = `launch failed: ${(error as Error).message}`;
       log.error(`session ${id} failed to start: ${(error as Error).message}`);
       this.launchInBackground();
     }

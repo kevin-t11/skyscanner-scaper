@@ -17,7 +17,7 @@ const fakeSearch: FlightSearch = {
     return { query: {}, complete: true, counts: { received: 0, passed: 0, failed: 0 }, itineraries: [], timings: {} } as unknown as FlightSearchResult;
   },
 };
-const server = createHttpServer(fakeSearch, () => ({ ready: 1 }), { port: 0 });
+const server = createHttpServer(fakeSearch, () => ({ status: "ok", live: 1 }), { port: 0 });
 const baseUrl = `http://localhost:${server.port}`;
 afterAll(() => server.stop());
 
@@ -90,7 +90,7 @@ describe("/url", () => {
   });
 
   test("requires x-api-key when configured", async () => {
-    const locked = createHttpServer(fakeSearch, () => ({}), { port: 0, apiKey: "secret" });
+    const locked = createHttpServer(fakeSearch, () => ({ live: 0 }), { port: 0, apiKey: "secret" });
     const base = `http://localhost:${locked.port}`;
     try {
       const denied = await post({ url: SEARCH_URL }, {}, base);
@@ -104,7 +104,7 @@ describe("/url", () => {
 
   test("saves each search response to outputDir and returns x-request-id", async () => {
     const outputDir = await mkdtemp(join(tmpdir(), "http-output-"));
-    const saving = createHttpServer(fakeSearch, () => ({}), { port: 0, outputDir });
+    const saving = createHttpServer(fakeSearch, () => ({ live: 0 }), { port: 0, outputDir });
     try {
       const response = await post({ url: SEARCH_URL }, {}, `http://localhost:${saving.port}`);
       const requestId = response.headers.get("x-request-id");
@@ -118,8 +118,17 @@ describe("/url", () => {
     }
   });
 
+  test("health is 503 while no browser is ready", async () => {
+    const cold = createHttpServer(fakeSearch, () => ({ status: "no-browsers", live: 0 }), { port: 0 });
+    try {
+      expect((await fetch(`http://localhost:${cold.port}/health`)).status).toBe(503);
+    } finally {
+      cold.stop();
+    }
+  });
+
   test("health and 404", async () => {
-    expect(await (await fetch(`${baseUrl}/health`)).json()).toEqual({ ready: 1 });
+    expect(await (await fetch(`${baseUrl}/health`)).json()).toEqual({ status: "ok", live: 1 });
     expect((await fetch(`${baseUrl}/nope`)).status).toBe(404);
   });
 });

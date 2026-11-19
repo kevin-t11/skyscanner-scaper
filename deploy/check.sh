@@ -10,10 +10,10 @@ SEARCH_URL="${1:-https://www.skyscanner.co.in/transport/flights/bom/blr/$(date -
 
 printf 'health  '
 for _ in $(seq 60); do
-  if curl -fs "$BASE/health" | grep -q '"ready":[1-9]'; then curl -fs "$BASE/health"; echo; break; fi
+  if curl -fs "$BASE/health" | grep -q '"live":[1-9]'; then curl -fs "$BASE/health"; echo; break; fi
   sleep 2
 done
-curl -fs "$BASE/health" | grep -q '"ready":[1-9]' || { echo "no ready browser after 2 min; see journalctl -u skyscanner -n 50"; exit 1; }
+curl -fs "$BASE/health" | grep -q '"live":[1-9]' || { echo "no ready browser after 2 min; see journalctl -u skyscanner -n 50"; exit 1; }
 
 printf 'search  '
 curl -s "$BASE/url" -H "x-api-key: $KEY" -H 'content-type: application/json' \

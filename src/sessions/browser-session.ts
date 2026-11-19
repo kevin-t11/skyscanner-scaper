@@ -13,6 +13,8 @@ export class BrowserSession {
   /** Requests sent to Skyscanner through this session (lookups + search API calls). */
   upstreamRequests = 0;
   readonly startedAt = Date.now();
+  /** When a search on this session last passed (epoch ms). */
+  lastSuccessAt?: number;
   private closing?: Promise<void>;
 
   constructor(

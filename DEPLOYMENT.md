@@ -67,6 +67,6 @@ Pass a Skyscanner URL to test a specific route: `bash deploy/check.sh '<search u
 
 | Symptom | Check |
 |---|---|
-| `/health` shows `"ready":0` and `launchErrors` growing | `journalctl -u skyscanner -n 50`: usually `PROXY_URL` (wrong credentials or format) |
+| `/health` returns 503 with `"live":0` and `launch_errors` growing (see `last_error`) | `journalctl -u skyscanner -n 50`: usually `PROXY_URL` (wrong credentials or format) |
 | `502` from Caddy | Service down: `systemctl status skyscanner` |
 | Timeout from outside | Port 80 not open in the Lightsail firewall |
