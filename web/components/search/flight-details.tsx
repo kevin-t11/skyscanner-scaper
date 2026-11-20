@@ -11,7 +11,10 @@ import { formatDay, formatDuration, formatTime, stopsLabel, type Itinerary, type
 
 const inr = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
 
-const minutesBetween = (from: string, to: string) => Math.round((Date.parse(to) - Date.parse(from)) / 60000);
+// Skyscanner times are airport-local without an offset; read them as UTC so the
+// viewer's own timezone (and its DST changes) can't shift the difference.
+const localMs = (iso: string) => Date.parse(/(Z|[+-]\d{2}:?\d{2})$/i.test(iso) ? iso : `${iso}Z`);
+const minutesBetween = (from: string, to: string) => Math.round((localMs(to) - localMs(from)) / 60000);
 
 function LegDetails({ leg, title }: { leg: Leg; title: string }) {
   return (
