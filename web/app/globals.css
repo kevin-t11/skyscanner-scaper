@@ -1,0 +1,167 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-dm-mono), ui-monospace, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--card);
+  --color-popover-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-inset: var(--inset);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--muted);
+  --color-accent-foreground: var(--foreground);
+  --color-primary: var(--foreground);
+  --color-primary-foreground: var(--background);
+  --color-secondary: var(--muted);
+  --color-secondary-foreground: var(--foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--border);
+  --color-ring: var(--ring);
+  --color-line: var(--line);
+
+  --radius-xs: calc(var(--radius) * 0.4);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Base corner radius; the whole --radius-* scale derives from it (rounded-xl = 1.4×). */
+:root {
+  --radius: 0.625rem;
+}
+
+/* Motion tokens (transitions.dev scale) */
+:root {
+  --duration-stagger: 40ms;
+  --duration-quick: 150ms;
+  --duration-fast: 250ms;
+  --duration-slow: 400ms;
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Two colours: ink and paper. Every grey is a step between them. */
+:root {
+  color-scheme: light;
+  --background: #fafafa;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --surface: #ffffff;
+  --inset: #f4f4f4;
+  --muted: #f0f0f0;
+  --muted-foreground: #646464;
+  --border: #e6e6e6;
+  --border-strong: #d2d2d2;
+  --line: #e6e6e6;
+  --ring: #a3a3a3;
+  --destructive: #0a0a0a;
+  --card-shadow: 0 0 0 1px rgb(10 10 10 / 0.06), 0 1px 2px rgb(10 10 10 / 0.04), 0 12px 32px -16px rgb(10 10 10 / 0.12);
+  --raised-shadow: 0 0 0 1px rgb(10 10 10 / 0.08), 0 1px 1px rgb(10 10 10 / 0.04), 0 4px 8px -2px rgb(10 10 10 / 0.08);
+  --inset-shadow: inset 0 1px 2px rgb(10 10 10 / 0.06), 0 0 0 1px rgb(10 10 10 / 0.06);
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #0a0a0a;
+  --foreground: #fafafa;
+  --card: #141414;
+  --surface: #1c1c1c;
+  --inset: #0f0f0f;
+  --muted: #1c1c1c;
+  --muted-foreground: #a0a0a0;
+  --border: rgb(255 255 255 / 0.08);
+  --border-strong: rgb(255 255 255 / 0.14);
+  --line: rgb(255 255 255 / 0.08);
+  --ring: #6b6b6b;
+  --destructive: #fafafa;
+  --card-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03), inset 0 0 0 1px rgb(255 255 255 / 0.04);
+  --raised-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 0 0 1px rgb(0 0 0 / 0.5), 0 4px 10px -2px rgb(0 0 0 / 0.5);
+  --inset-shadow: inset 0 1px 2px rgb(0 0 0 / 0.5), 0 0 0 1px rgb(255 255 255 / 0.05);
+}
+
+@utility shadow-card {
+  box-shadow: var(--card-shadow);
+}
+@utility shadow-raised {
+  box-shadow: var(--raised-shadow);
+}
+@utility shadow-inset {
+  box-shadow: var(--inset-shadow);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "ss01";
+  }
+  button:not(:disabled),
+  [role="button"],
+  [role="option"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="menuitemradio"],
+  summary,
+  a[href] {
+    cursor: pointer;
+  }
+  ::selection {
+    @apply bg-foreground text-background;
+  }
+}
+
+/* Skeleton: a calm opacity breath, no travelling shine. */
+@layer utilities {
+  .skeleton {
+    @apply rounded-md bg-muted;
+    animation: skeleton-breathe 1.6s linear infinite;
+  }
+  @keyframes skeleton-breathe {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+  @keyframes rise-in {
+    from { opacity: 0; transform: translateY(8px); }
+  }
+  .rise-in {
+    animation: rise-in var(--duration-slow) var(--ease-smooth-out) both;
+    animation-delay: calc(var(--i, 0) * var(--duration-stagger));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton, .rise-in { animation: none; }
+  }
+}
+
+/*
+  Concentric corners: outer radius = inner radius + padding.
+  A shell owns its padding and radius (`shell-1` = 4px padding, radius-xl;
+  `shell-0.5/lg` = 2px padding, radius-lg). Anything inside it that draws its own
+  rounded surface (hover fill, selected row, tab indicator) uses `rounded-nested`.
+*/
+@utility shell-* {
+  --shell-pad: --spacing(--value(number));
+  --shell-pad: --value([length]);
+  --shell-radius: var(--radius-xl);
+  --shell-radius: --modifier(--radius-*, [length]);
+  padding: var(--shell-pad);
+  border-radius: var(--shell-radius);
+}
+
+@utility rounded-nested {
+  border-radius: max(2px, calc(var(--shell-radius, var(--radius-xl)) - var(--shell-pad, 0px)));
+}
