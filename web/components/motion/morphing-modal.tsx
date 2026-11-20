@@ -36,10 +36,13 @@ function handleModalKeyDown(
   }
 
   if (event.key !== "Tab") return;
-  const focusable = panel?.querySelectorAll<HTMLElement>(
-    'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
-  );
+  const focusable = panel?.querySelectorAll<HTMLElement>(FOCUSABLE);
   if (!focusable?.length) return;
+  if (!panel?.contains(document.activeElement)) {
+    event.preventDefault();
+    (event.shiftKey ? focusable[focusable.length - 1] : focusable[0]).focus();
+    return;
+  }
 
   const first = focusable[0];
   const last = focusable[focusable.length - 1];
@@ -51,6 +54,9 @@ function handleModalKeyDown(
     first.focus();
   }
 }
+
+const FOCUSABLE =
+    'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
 export interface MorphingModalProps {
   /** Which view is currently shown. `null` closes the modal. */
@@ -83,6 +89,21 @@ export function MorphingModal({
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
+    };
+  }, [open, managedFocus]);
+
+  useEffect(() => {
+    if (!open || managedFocus) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const frame = requestAnimationFrame(() => {
+      const panel = panelRef.current;
+      if (panel && !panel.contains(document.activeElement)) {
+        panel.querySelector<HTMLElement>(FOCUSABLE)?.focus({ preventScroll: true });
+      }
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      opener?.focus({ preventScroll: true });
     };
   }, [open, managedFocus]);
 
