@@ -72,25 +72,19 @@ export default function Home() {
         </section>
 
         <section id="how-it-works" className="scroll-mt-14 border-t border-border">
-          <div className="mx-auto grid max-w-6xl gap-16 px-6 py-24 lg:grid-cols-[5fr_6fr]">
-            <div>
-              <h2 className="text-2xl font-medium tracking-tight">How it works</h2>
-              <ol className="mt-10 space-y-8">
-                {STEPS.map((step, index) => (
-                  <li key={step.title} className="grid grid-cols-[2rem_1fr] gap-4">
-                    <span className="font-mono text-sm text-muted-foreground tabular-nums">0{index + 1}</span>
-                    <div>
-                      <h3 className="text-base font-medium">{step.title}</h3>
-                      <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{step.body}</p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </div>
-            <div>
-              <h2 className="text-2xl font-medium tracking-tight">Questions</h2>
-              <BouncyAccordion items={FAQ} defaultValue="prices" className="mt-10" />
-            </div>
+          <div className="mx-auto max-w-5xl px-6 py-24 text-center">
+            <h2 className="text-2xl font-medium tracking-tight">How it works</h2>
+            <ol className="mt-12 grid gap-10 sm:grid-cols-3 sm:gap-8">
+              {STEPS.map((step, index) => (
+                <li key={step.title}>
+                  <span className="font-mono text-sm text-muted-foreground tabular-nums">0{index + 1}</span>
+                  <h3 className="mt-3 text-base font-medium">{step.title}</h3>
+                  <p className="mx-auto mt-1.5 max-w-xs text-sm leading-relaxed text-pretty text-muted-foreground">{step.body}</p>
+                </li>
+              ))}
+            </ol>
+            <h2 className="mt-24 text-2xl font-medium tracking-tight">Questions</h2>
+            <BouncyAccordion items={FAQ} defaultValue="prices" className="mx-auto mt-10 max-w-2xl text-left" />
           </div>
         </section>
       </main>

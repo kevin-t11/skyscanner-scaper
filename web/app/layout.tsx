@@ -24,6 +24,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" suppressHydrationWarning className={`${dmSans.variable} ${dmMono.variable} h-full`}>
       <body className="min-h-full">
         <ClerkProvider
+          signInUrl="/sign-in"
+          signUpUrl="/sign-up"
           appearance={{
             variables: {
               colorPrimary: "var(--foreground)",
