@@ -47,7 +47,8 @@ export interface ButtonLinkProps extends Omit<
 type Ripple = { id: number; x: number; y: number; size: number };
 
 const VARIANT_CLASS: Record<ButtonVariant, string> = {
-  primary: "bg-primary text-primary-foreground hover:bg-primary/90",
+  primary:
+    "bg-linear-to-b from-primary/80 to-primary text-primary-foreground shadow-[inset_0_1px_0_--theme(--color-primary-foreground/0.15)] hover:from-primary/70",
   secondary: "border border-border bg-card text-foreground hover:border-border",
   ghost: "text-muted-foreground hover:text-foreground hover:bg-muted/60",
   outline:
@@ -55,9 +56,9 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
 };
 
 const SIZE_CLASS: Record<ButtonSize, string> = {
-  sm: "h-8 px-3 text-xs gap-1.5 rounded-full",
-  md: "h-10 px-5 text-sm gap-2 rounded-full",
-  lg: "h-12 px-6 text-base gap-2 rounded-full",
+  sm: "h-8 px-3 text-xs gap-1.5 rounded-md",
+  md: "h-10 px-5 text-sm gap-2 rounded-lg",
+  lg: "h-12 px-6 text-base gap-2 rounded-lg",
   icon: "h-8 w-8 rounded-lg",
 };
 
