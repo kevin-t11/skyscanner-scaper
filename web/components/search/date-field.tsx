@@ -33,6 +33,7 @@ export function DateField({ trip, value, onChange, min }: DateFieldProps) {
         onChange({ from: range.from !== value?.from ? range.from : (range.to ?? range.from) });
       }}
       min={min}
+      className="w-full"
       closeOnSelect
       showSummary={false}
     >

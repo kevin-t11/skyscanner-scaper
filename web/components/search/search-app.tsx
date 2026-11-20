@@ -4,14 +4,14 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/motion/button/base";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/motion/breadcrumb";
 import type { DateRange } from "@/components/motion/date-range-picker";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/motion/dropdown-menu";
 import { Loader } from "@/components/motion/loader";
 import { Pagination } from "@/components/motion/pagination";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/motion/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/motion/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/motion/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/motion/tooltip";
-import { AlertIcon, ExternalLinkIcon, SearchIcon, SwapIcon, UserIcon } from "@/components/icons";
+import { AlertIcon, ExternalLinkIcon, SearchIcon, SwapIcon } from "@/components/icons";
+import { AdultsStepper } from "@/components/search/adults-stepper";
 import { DateField } from "@/components/search/date-field";
 import { PlaceField } from "@/components/search/place-field";
 import { PopularRoutes } from "@/components/search/popular-routes";
@@ -37,7 +37,7 @@ export function SearchApp() {
   const [trip, setTrip] = useState<"oneway" | "return">("oneway");
   const [dates, setDates] = useState<DateRange | null>({ from: isoDate(14) });
   const [cabin, setCabin] = useState<CabinClass>("economy");
-  const [adults, setAdults] = useState("1");
+  const [adults, setAdults] = useState(1);
   const [sort, setSort] = useState<SortOrder>("best");
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
@@ -119,16 +119,16 @@ export function SearchApp() {
           void search();
         }}
       >
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <Tabs value={trip} onValueChange={(v) => setTrip(v as "oneway" | "return")}>
             <TabsList>
               <TabsTrigger value="oneway">One way</TabsTrigger>
               <TabsTrigger value="return">Return</TabsTrigger>
             </TabsList>
           </Tabs>
-          <div className="flex items-center gap-2">
-            <Select value={cabin} onValueChange={(v) => setCabin(v as CabinClass)}>
-              <SelectTrigger className="w-44">
+          <div className="flex w-full gap-2 sm:w-auto">
+            <Select value={cabin} onValueChange={(v) => setCabin(v as CabinClass)} className="min-w-0 flex-1 sm:w-40 sm:flex-none">
+              <SelectTrigger>
                 <SelectValue placeholder="Cabin" />
               </SelectTrigger>
               <SelectContent>
@@ -139,23 +139,7 @@ export function SearchApp() {
                 ))}
               </SelectContent>
             </Select>
-            <DropdownMenu>
-              <DropdownMenuTrigger>
-                <Button type="button" variant="outline" size="sm" aria-label={`${adults} adult${adults === "1" ? "" : "s"}`}>
-                  <UserIcon className="size-4" />
-                  <span className="tabular-nums">{adults}</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuRadioGroup value={adults} onValueChange={setAdults}>
-                  {["1", "2", "3", "4", "5", "6", "7", "8"].map((n) => (
-                    <DropdownMenuRadioItem key={n} value={n} closeOnSelect>
-                      {n} adult{n === "1" ? "" : "s"}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <AdultsStepper value={adults} onChange={setAdults} />
           </div>
         </div>
 
@@ -184,7 +168,7 @@ export function SearchApp() {
             <span className="block text-xs text-muted-foreground">{trip === "return" ? "Dates" : "Date"}</span>
             <DateField trip={trip} value={dates} onChange={setDates} min={isoDate(0)} />
           </div>
-          <Button type="submit" size="lg" disabled={status.kind === "loading" || missing !== null} title={missing ?? undefined}>
+          <Button type="submit" className="h-10 rounded-xl px-6" disabled={status.kind === "loading" || missing !== null} title={missing ?? undefined}>
             <SearchIcon className="size-4" />
             Search
           </Button>

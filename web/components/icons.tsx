@@ -187,3 +187,21 @@ export function RouteIcon(props: IconProps) {
     </Svg>
   );
 }
+
+/** `plus-sign-duotone-rounded` (icons.kevinnn.xyz). */
+export function PlusIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 4V20M20 12H4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </Svg>
+  );
+}
+
+/** `minus-sign-duotone-rounded` (icons.kevinnn.xyz). */
+export function MinusIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M20 12L4 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </Svg>
+  );
+}
