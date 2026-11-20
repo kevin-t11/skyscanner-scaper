@@ -45,7 +45,7 @@ function toBookingOption(option: ApiPricingOption, agentNames: Map<string, strin
   return { agentId, agentName: agentNames.get(agentId) ?? agentId, price, url: new URL(url, siteOrigin).href };
 }
 
-export function normalizeItinerary(raw: ApiItinerary, agentNames: Map<string, string>, siteOrigin: string): Itinerary {
+function normalizeItinerary(raw: ApiItinerary, agentNames: Map<string, string>, siteOrigin: string): Itinerary {
   const legs = (raw.legs ?? []).map(toLeg);
   const bookingOptions = (raw.pricingOptions ?? [])
     .map((option) => toBookingOption(option, agentNames, siteOrigin))

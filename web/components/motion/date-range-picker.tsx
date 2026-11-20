@@ -763,14 +763,14 @@ export function DateRangePickerTrigger({
         ref={mergedRef}
         layout={!ctx.reduce}
         transition={{ layout: SPRING_LAYOUT }}
-        style={{ borderRadius: 12, ...props.style }}
+        style={props.style}
         type="button"
         disabled={disabled || ctx.disabled}
         aria-label={
           props["aria-label"] ?? ctx.t("triggerLabel", { label: ctx.label, summary })
         }
         className={cn(
-          "inline-flex h-9 w-fit max-w-full items-center gap-2 rounded-lg border border-border bg-background px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40",
+          "inline-flex h-9 w-fit max-w-full items-center gap-2 rounded-lg border border-border bg-transparent px-3 text-sm text-foreground transition-colors hover:border-(--color-border-strong) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40",
           className,
         )}
       >

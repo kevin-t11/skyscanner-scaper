@@ -10,7 +10,7 @@ export interface ProxySettings {
  * (optionally with a scheme, e.g. `http://host:port:user:pass`),
  * → `{ server: "http://host:port", username, password }`.
  */
-export function parseProxyUrl(proxyUrl: string): ProxySettings {
+function parseProxyUrl(proxyUrl: string): ProxySettings {
   const [, scheme = "http", rest = proxyUrl] = /^([a-z0-9]+):\/\/(.*)$/i.exec(proxyUrl) ?? [];
   // URL form when the part after the last `@` is `host:port`; otherwise the dashboard form,
   // whose second field is the port and whose password may contain `:` or `@`.

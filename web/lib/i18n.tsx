@@ -27,26 +27,8 @@ const NO_MESSAGES: LocaleMessages = {};
 
 const LocaleContext = createContext<LocaleContextValue>({ messages: NO_MESSAGES });
 
-/** Without a locale, digits stay plain so server and client render the same text. */
-export function formatNumber(value: number, locale?: string) {
+function formatNumber(value: number, locale?: string) {
   return locale ? new Intl.NumberFormat(locale).format(value) : String(value);
-}
-
-export interface LocaleProviderProps {
-  /** BCP 47 tag, e.g. `de`, `pt-BR`. Drives `Intl` number formatting. */
-  locale: string;
-  /**
-   * Component namespace → translated strings. Missing keys fall back to English.
-   * Pass a stable object (a module constant, imported JSON or a memoized value):
-   * a new object each render gives every translated component a new `t`.
-   */
-  messages?: LocaleMessages;
-  children: ReactNode;
-}
-
-export function LocaleProvider({ locale, messages = NO_MESSAGES, children }: LocaleProviderProps) {
-  const value = useMemo(() => ({ locale, messages }), [locale, messages]);
-  return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>;
 }
 
 export function useLocale(): { locale?: string } {

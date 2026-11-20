@@ -307,7 +307,7 @@ export function SelectTrigger({ className, children }: SelectTriggerProps) {
         borderBottomRightRadius: ctx.reduce || isTop ? RADIUS : nearRadius,
       }}
       className={cn(
-        "relative z-10 flex h-9 w-full items-center justify-between gap-2 border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors",
+        "relative z-10 flex h-9 w-full items-center justify-between gap-2 whitespace-nowrap border border-border bg-transparent px-3 text-sm text-foreground outline-none transition-colors",
         "hover:border-(--color-border-strong) focus-visible:ring-2 focus-visible:ring-foreground/20",
         "disabled:pointer-events-none disabled:opacity-50",
         className,
