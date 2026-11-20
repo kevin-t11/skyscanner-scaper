@@ -119,7 +119,7 @@ export function SearchApp() {
         }}
       >
         <div className="flex flex-wrap items-center gap-2">
-          <Tabs value={trip} onValueChange={(v) => setTrip(v as "oneway" | "return")}>
+          <Tabs variant="segment" value={trip} onValueChange={(v) => setTrip(v as "oneway" | "return")}>
             <TabsList>
               <TabsTrigger value="oneway">One way</TabsTrigger>
               <TabsTrigger value="return">Return</TabsTrigger>
@@ -151,7 +151,7 @@ export function SearchApp() {
                 variant="ghost"
                 size="icon"
                 aria-label="Swap origin and destination"
-                className="mb-1 justify-self-center"
+                className="justify-self-center"
                 onClick={() => {
                   setFrom(to);
                   setTo(from);
@@ -167,7 +167,7 @@ export function SearchApp() {
             <span className="block text-xs text-muted-foreground">{trip === "return" ? "Dates" : "Date"}</span>
             <DateField trip={trip} value={dates} onChange={setDates} min={isoDate(0)} />
           </div>
-          <Button type="submit" className="h-10 rounded-xl px-6" disabled={status.kind === "loading" || missing !== null} title={missing ?? undefined}>
+          <Button type="submit" disabled={status.kind === "loading" || missing !== null} title={missing ?? undefined}>
             <SearchIcon className="size-4" />
             Search
           </Button>
@@ -197,7 +197,7 @@ export function SearchApp() {
       {status.kind === "done" && result ? (
         <section className="space-y-4" aria-label="Results">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Tabs value={sort} onValueChange={(v) => { setSort(v as SortOrder); setPage(1); }}>
+            <Tabs variant="segment" value={sort} onValueChange={(v) => { setSort(v as SortOrder); setPage(1); }}>
               <TabsList>
                 <TabsTrigger value="best">Best</TabsTrigger>
                 <TabsTrigger value="cheapest">Cheapest</TabsTrigger>

@@ -30,7 +30,7 @@ export function ComboboxTrigger({ children, className }: ComboboxTriggerProps) {
         context.setOpen(true);
       }}
       className={cn(
-        "relative z-20 flex h-10 w-full min-w-52 cursor-text items-center justify-between gap-3 rounded-xl border border-border bg-transparent px-3 text-sm text-foreground transition-[border-color] hover:border-(--color-border-strong)",
+        "relative z-20 flex h-9 w-full min-w-52 cursor-text items-center justify-between gap-3 rounded-lg border border-border bg-transparent px-3 text-sm text-foreground transition-[border-color] hover:border-(--color-border-strong)",
         "focus-within:ring-2 focus-within:ring-foreground/20",
         context.disabled && "pointer-events-none opacity-50",
         className,
@@ -183,7 +183,7 @@ export function ComboboxInput({
         }}
         onKeyDown={handleKeyDown}
         className={cn(
-          "h-10 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed",
+          "h-9 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed",
           className,
         )}
       />

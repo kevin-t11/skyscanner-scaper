@@ -37,7 +37,7 @@ export function DateField({ trip, value, onChange, min }: DateFieldProps) {
       closeOnSelect
       showSummary={false}
     >
-      <DateRangePickerTrigger className="h-10 w-full" aria-label={`${trip === "return" ? "Dates" : "Date"}: ${summary}`}>
+      <DateRangePickerTrigger className="w-full" aria-label={`${trip === "return" ? "Dates" : "Date"}: ${summary}`}>
         <CalendarIcon className="size-4 shrink-0 text-muted-foreground" />
         <span className="truncate">{summary}</span>
       </DateRangePickerTrigger>

@@ -776,7 +776,7 @@ export function DateRangePickerTrigger({
           props["aria-label"] ?? ctx.t("triggerLabel", { label: ctx.label, summary })
         }
         className={cn(
-          "inline-flex h-9 w-fit max-w-full items-center gap-2 rounded-xl border border-border bg-background px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40",
+          "inline-flex h-9 w-fit max-w-full items-center gap-2 rounded-lg border border-border bg-background px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40",
           className,
         )}
       >

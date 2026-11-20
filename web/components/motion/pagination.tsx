@@ -99,7 +99,7 @@ export interface PaginationProps
 }
 
 const CONTROL =
-  "relative inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-sm tabular-nums sm:h-9 sm:min-w-9 outline-none transition-[color,background-color,transform] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.94] motion-reduce:active:scale-100";
+  "relative inline-flex h-9 min-w-9 items-center justify-center rounded-lg px-2 text-sm tabular-nums outline-none transition-[color,background-color,transform] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.94] motion-reduce:active:scale-100";
 
 export function Pagination({
   totalPages,
@@ -257,7 +257,7 @@ export function Pagination({
                             aria-hidden="true"
                             layoutId={reduce ? undefined : "pagination-current"}
                             transition={SPRING_LAYOUT}
-                            className="absolute inset-0 rounded-full bg-foreground"
+                            className="absolute inset-0 rounded-lg bg-foreground"
                           />
                         ) : null}
                         <span className="relative">{item}</span>
