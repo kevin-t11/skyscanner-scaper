@@ -14,7 +14,6 @@ import { AlertIcon, ExternalLinkIcon, SearchIcon, SwapIcon } from "@/components/
 import { AdultsStepper } from "@/components/search/adults-stepper";
 import { DateField } from "@/components/search/date-field";
 import { PlaceField } from "@/components/search/place-field";
-import { PopularRoutes } from "@/components/search/popular-routes";
 import { ResultCard } from "@/components/search/result-card";
 import { ResultsSkeleton } from "@/components/search/results-skeleton";
 import { CABIN_LABELS, sortItineraries, type CabinClass, type Place, type SearchResponse, type SortOrder } from "@/lib/flights";
@@ -174,15 +173,6 @@ export function SearchApp() {
           </Button>
         </div>
       </form>
-
-      {status.kind === "idle" ? (
-        <PopularRoutes
-          onPick={(route) => {
-            setFrom(route.from);
-            setTo(route.to);
-          }}
-        />
-      ) : null}
 
       {status.kind === "loading" ? (
         <section aria-live="polite" className="space-y-4">
