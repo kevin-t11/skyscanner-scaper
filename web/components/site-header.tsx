@@ -27,7 +27,7 @@ export function SiteHeader({ children }: { children?: ReactNode }) {
           </SharedLayoutBg>
         </nav>
         <div className="ml-auto flex items-center gap-2 sm:ml-0">
-          <ThemeToggle variant="circle" />
+          <ThemeToggle variant="circle" aria-label="Toggle theme" className="size-8 rounded-md text-muted-foreground transition-colors hover:text-foreground" iconClassName="size-4" />
           <Show when="signed-out">
             <Link href="/sign-in" className="rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
               Log in
