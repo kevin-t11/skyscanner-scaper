@@ -7,7 +7,7 @@ export function readDotEnv(path = ".env"): Record<string, string> {
   return parseDotEnv(readFileSync(path, "utf8"));
 }
 
-export function parseDotEnv(text: string): Record<string, string> {
+function parseDotEnv(text: string): Record<string, string> {
   const values: Record<string, string> = {};
   for (const rawLine of text.split(/\r?\n/)) {
     const match = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(rawLine);

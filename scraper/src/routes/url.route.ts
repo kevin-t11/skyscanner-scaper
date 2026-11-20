@@ -20,9 +20,9 @@ import type { RouteContext } from "./route-context";
 
 // ── request ──
 
-export const DEFAULT_MAX_ITEMS = 50;
-export const MAX_ITEMS_LIMIT = 1_000;
-export const DEFAULT_SORT: SortOrder = "best";
+const DEFAULT_MAX_ITEMS = 50;
+const MAX_ITEMS_LIMIT = 1_000;
+const DEFAULT_SORT: SortOrder = "best";
 
 export class InvalidRequestError extends Error {}
 
@@ -61,7 +61,7 @@ export function describeListOptions(input: RawSearchInput): Pick<SearchRequestSu
 /** Unvalidated text input for a summary: strings as-is, anything else `null`. */
 export const textOrNull = (value: unknown): string | null => (typeof value === "string" ? value : null);
 
-export function parseSearchRequest(input: RawSearchInput): ParsedSearchRequest {
+function parseSearchRequest(input: RawSearchInput): ParsedSearchRequest {
   const searchUrl = input.url;
   if (typeof searchUrl !== "string" || !searchUrl) throw new InvalidRequestError("`url` is required");
   const { query, pathAndQuery } = parseSearchUrl(searchUrl); // fail fast, before a browser session is taken
@@ -112,7 +112,7 @@ export interface SearchEnvelope {
   failed: SearchFailure | Record<string, never>;
 }
 
-export function passEnvelope(request: SearchRequestSummary, result: FlightSearchResult, timeElapsedMs: number): SearchEnvelope {
+function passEnvelope(request: SearchRequestSummary, result: FlightSearchResult, timeElapsedMs: number): SearchEnvelope {
   return {
     status: "pass",
     timeElapsedMs,
@@ -130,7 +130,7 @@ export function passEnvelope(request: SearchRequestSummary, result: FlightSearch
   };
 }
 
-export const failEnvelope = (failure: SearchFailure, timeElapsedMs: number, request: SearchRequestSummary): SearchEnvelope => ({
+const failEnvelope = (failure: SearchFailure, timeElapsedMs: number, request: SearchRequestSummary): SearchEnvelope => ({
   status: "fail",
   timeElapsedMs,
   request,

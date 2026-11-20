@@ -210,7 +210,7 @@ export function SearchApp() {
                 <Select
                   value={cabin}
                   onValueChange={(v) => setCabin(v as CabinClass)}
-                  className="min-w-0 flex-1 sm:w-40 sm:flex-none"
+                  className="min-w-0 flex-1 sm:w-44 sm:flex-none"
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Cabin" />
