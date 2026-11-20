@@ -1,13 +1,7 @@
 "use client";
 // beui.dev/components/motion/date-range-picker
 
-import {
-  ArrowRight,
-  CalendarDays,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { ArrowRightIcon as ArrowRight, CalendarIcon as CalendarDays, ChevronDownIcon as ChevronDown, ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight } from "@/components/icons";
 import {
   AnimatePresence,
   type HTMLMotionProps,
@@ -135,7 +129,7 @@ export function DateRangePickerCalendar({
       {...props}
       aria-label={props["aria-label"] ?? ctx.label}
       className={cn(
-        "w-80 max-w-full rounded-2xl border border-border bg-background p-3.5",
+        "w-80 max-w-full rounded-xl border border-border bg-background p-3.5",
         className,
       )}
     >
@@ -501,12 +495,12 @@ export function DateRangePickerGrid({
                               "relative h-8 p-0 text-center",
                               inRange &&
                                 (dayIndex === 0 || date === shownRange?.from) &&
-                                "rounded-l-full",
+                                "rounded-l-lg",
                               inRange &&
                                 (dayIndex === 6 ||
                                   date === shownRange?.to ||
                                   !shownRange?.to) &&
-                                "rounded-r-full",
+                                "rounded-r-lg",
                             )}
                           >
                             {date && (
@@ -553,7 +547,7 @@ export function DateRangePickerGrid({
                                 }}
                                 onKeyDown={(event) => onKey(event, date)}
                                 className={cn(
-                                  "relative mx-auto flex h-8 w-full max-w-8 items-center justify-center rounded-full text-xs tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-30",
+                                  "relative mx-auto flex h-8 w-full max-w-8 items-center justify-center rounded-lg text-xs tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-30",
                                   endpoint
                                     ? "bg-foreground font-medium text-background"
                                     : canHover &&
@@ -622,7 +616,7 @@ export function DateRangePickerClear({
       aria-label={props["aria-label"] ?? ctx.t("clearLabel")}
       disabled={disabled || ctx.disabled || !ctx.value}
       className={cn(
-        "rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-30",
+        "rounded-lg px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-30",
         className,
       )}
       onClick={(event) => {
@@ -992,7 +986,7 @@ function CalendarChoices({
           whileTap={reduce ? undefined : { scale: 0.96 }}
           transition={SPRING_PRESS}
           className={cn(
-            "flex h-13 items-center justify-center rounded-xl px-1 text-[13px] tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-25",
+            "flex h-13 items-center justify-center rounded-lg px-1 text-[13px] tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-25",
             choice.id === selected
               ? "bg-foreground font-medium text-background"
               : "bg-muted/40 hover:bg-muted",

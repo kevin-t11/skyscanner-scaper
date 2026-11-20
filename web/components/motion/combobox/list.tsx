@@ -1,6 +1,6 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { TickIcon as Check } from "@/components/icons";
 import { motion } from "motion/react";
 import {
   type ReactNode,

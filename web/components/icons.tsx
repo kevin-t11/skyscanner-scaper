@@ -1,9 +1,9 @@
 import type { SVGProps } from "react";
 
-type IconProps = SVGProps<SVGSVGElement>;
+type IconProps = SVGProps<SVGSVGElement> & { size?: number };
 
-function Svg(props: IconProps) {
-  return <svg width={18} height={18} viewBox="0 0 24 24" fill="none" aria-hidden focusable="false" {...props} />;
+function Svg({ size = 18, ...props }: IconProps) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden focusable="false" {...props} />;
 }
 
 /** `airplane-01-duotone-rounded` (icons.kevinnn.xyz). */
@@ -202,6 +202,98 @@ export function MinusIcon(props: IconProps) {
   return (
     <Svg {...props}>
       <path d="M20 12L4 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </Svg>
+  );
+}
+
+/** `cancel-01-duotone-rounded` (icons.kevinnn.xyz). */
+export function CloseIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M18 6L6.00081 17.9992M17.9992 18L6 6.00085" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </Svg>
+  );
+}
+
+/** `moon-02-duotone-rounded` (icons.kevinnn.xyz). */
+export function MoonIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path opacity="0.4" d="M21.5 14.0784C20.3003 14.7189 18.9301 15.0821 17.4751 15.0821C12.7491 15.0821 8.91792 11.2509 8.91792 6.52485C8.91792 5.06986 9.28105 3.69968 9.92163 2.5C5.66765 3.49698 2.5 7.31513 2.5 11.8731C2.5 17.1899 6.8101 21.5 12.1269 21.5C16.6849 21.5 20.503 18.3324 21.5 14.0784Z" fill="currentColor"/>
+      <path d="M21.5 14.0784C20.3003 14.7189 18.9301 15.0821 17.4751 15.0821C12.7491 15.0821 8.91792 11.2509 8.91792 6.52485C8.91792 5.06986 9.28105 3.69968 9.92163 2.5C5.66765 3.49698 2.5 7.31513 2.5 11.8731C2.5 17.1899 6.8101 21.5 12.1269 21.5C16.6849 21.5 20.503 18.3324 21.5 14.0784Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </Svg>
+  );
+}
+
+/** `sun-03-duotone-rounded` (icons.kevinnn.xyz). */
+export function SunIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path opacity="0.4" d="M17 12C17 14.7614 14.7614 17 12 17C9.23858 17 7 14.7614 7 12C7 9.23858 9.23858 7 12 7C14.7614 7 17 9.23858 17 12Z" fill="currentColor"/>
+      <path d="M17 12C17 14.7614 14.7614 17 12 17C9.23858 17 7 14.7614 7 12C7 9.23858 9.23858 7 12 7C14.7614 7 17 9.23858 17 12Z" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M12 2V3.5M12 20.5V22M19.0708 19.0713L18.0101 18.0106M5.98926 5.98926L4.9286 4.9286M22 12H20.5M3.5 12H2M19.0713 4.92871L18.0106 5.98937M5.98975 18.0107L4.92909 19.0714" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </Svg>
+  );
+}
+
+/** `more-horizontal-duotone-rounded` (icons.kevinnn.xyz). */
+export function MoreHorizontalIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M6.00449 12.5V12M18.0045 12.5V12M12.0045 12.5V12M7.00449 12.5C7.00449 11.9477 6.55677 11.5 6.00449 11.5C5.4522 11.5 5.00449 11.9477 5.00449 12.5C5.00449 13.0523 5.4522 13.5 6.00449 13.5C6.55677 13.5 7.00449 13.0523 7.00449 12.5ZM19.0045 12.5C19.0045 11.9477 18.5568 11.5 18.0045 11.5C17.4522 11.5 17.0045 11.9477 17.0045 12.5C17.0045 13.0523 17.4522 13.5 18.0045 13.5C18.5568 13.5 19.0045 13.0523 19.0045 12.5ZM13.0045 12.5C13.0045 11.9477 12.5568 11.5 12.0045 11.5C11.4522 11.5 11.0045 11.9477 11.0045 12.5C11.0045 13.0523 11.4522 13.5 12.0045 13.5C12.5568 13.5 13.0045 13.0523 13.0045 12.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </Svg>
+  );
+}
+
+/** `arrow-left-double-duotone-rounded` (icons.kevinnn.xyz). */
+export function ChevronsLeftIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path opacity="0.4" d="M11.5 18C11.5 18 5.50001 13.5811 5.5 12C5.49999 10.4188 11.5 6 11.5 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path opacity="0.4" d="M18.5 18C18.5 18 12.5 13.5811 12.5 12C12.5 10.4188 18.5 6 18.5 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </Svg>
+  );
+}
+
+/** `arrow-right-double-duotone-rounded` (icons.kevinnn.xyz). */
+export function ChevronsRightIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path opacity="0.4" d="M12.5 18C12.5 18 18.5 13.5811 18.5 12C18.5 10.4188 12.5 6 12.5 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path opacity="0.4" d="M5.50005 18C5.50005 18 11.5 13.5811 11.5 12C11.5 10.4188 5.5 6 5.5 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </Svg>
+  );
+}
+
+/** `tick-02-duotone-rounded` (icons.kevinnn.xyz). */
+/** `checkmark-circle-01-duotone-rounded` (icons.kevinnn.xyz). */
+export function TickIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path opacity="0.4" d="M22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12Z" fill="currentColor" />
+      <path d="M22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12Z" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M8 12.75C8 12.75 9.6 13.6625 10.4 15C10.4 15 12.8 9.75 16 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+/** `unfold-more-duotone-rounded` (icons.kevinnn.xyz). */
+export function UnfoldMoreIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M18 14C18 14 13.5811 19 12 19C10.4188 19 6 14 6 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M18 9.99996C18 9.99996 13.5811 5.00001 12 5C10.4188 4.99999 6 10 6 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </Svg>
+  );
+}
+
+/** `link-01-duotone-rounded` (icons.kevinnn.xyz). */
+export function LinkIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path opacity="0.4" d="M6.9484 12.886L6.48405 13.3503C4.50532 15.3291 4.50532 18.5372 6.48405 20.516C8.46279 22.4947 11.671 22.4947 13.6497 20.516L16.5159 17.6497C18.2962 15.8694 18.4748 13.0939 17.0516 11.114L14.6497 13.516C12.671 15.4947 9.46279 15.4947 7.48405 13.516C7.2856 13.3175 7.10705 13.1067 6.9484 12.886Z" fill="currentColor"/>
+      <path d="M9.14339 10.691L9.35031 10.4841C11.329 8.50532 14.5372 8.50532 16.5159 10.4841C18.4947 12.4628 18.4947 15.671 16.5159 17.6497L13.6497 20.5159C11.671 22.4947 8.46279 22.4947 6.48405 20.5159C4.50532 18.5372 4.50532 15.329 6.48405 13.3503L6.9484 12.886" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M17.0516 11.114L17.5159 10.6497C19.4947 8.67095 19.4947 5.46279 17.5159 3.48405C15.5372 1.50532 12.329 1.50532 10.3503 3.48405L7.48405 6.35031C5.50532 8.32904 5.50532 11.5372 7.48405 13.5159C9.46279 15.4947 12.671 15.4947 14.6497 13.5159L14.8566 13.309" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
     </Svg>
   );
 }

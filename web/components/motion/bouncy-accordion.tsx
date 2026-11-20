@@ -1,7 +1,7 @@
 "use client";
 // beui.dev/components/motion/bouncy-accordion
 
-import { ChevronDown } from "lucide-react";
+import { ChevronDownIcon as ChevronDown } from "@/components/icons";
 import {
   motion,
   type Transition,

@@ -1,7 +1,7 @@
 "use client";
 // beui.dev/components/motion/theme-toggle
 
-import { Moon, Sun } from "lucide-react";
+import { MoonIcon as Moon, SunIcon as Sun } from "@/components/icons";
 import { useReducedMotion } from "motion/react";
 import { useTheme } from "next-themes";
 import { type ComponentPropsWithoutRef, useEffect, useState } from "react";

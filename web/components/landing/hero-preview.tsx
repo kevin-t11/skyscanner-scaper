@@ -10,13 +10,13 @@ const ROWS = [
 export function HeroPreview() {
   const [first, ...rest] = ROWS;
   return (
-    <div className="relative rounded-3xl border border-border bg-card p-3 shadow-card">
+    <div className="relative rounded-2xl border border-border bg-card p-3 shadow-card">
       <div className="flex items-center justify-between px-3 pt-2 pb-4 text-xs text-muted-foreground">
         <span className="font-mono">BOM → DEL · Tue 15 Dec · 1 adult</span>
         <span className="font-mono tabular-nums">208 flights · 3.4s</span>
       </div>
 
-      <article className="relative grid grid-cols-[1fr_auto] overflow-hidden rounded-2xl bg-foreground text-background">
+      <article className="relative grid grid-cols-[1fr_auto] overflow-hidden rounded-lg bg-foreground text-background">
         <div className="space-y-5 p-5">
           <div className="flex items-baseline justify-between text-xs opacity-70">
             <span>{first.carrier} · <span className="font-mono">{first.flight}</span></span>

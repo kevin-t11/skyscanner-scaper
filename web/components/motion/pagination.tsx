@@ -1,7 +1,7 @@
 "use client";
 // beui.dev/components/motion/pagination
 
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, ChevronsLeftIcon as ChevronsLeft, ChevronsRightIcon as ChevronsRight } from "@/components/icons";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "motion/react";
 import {
   type ComponentPropsWithRef,

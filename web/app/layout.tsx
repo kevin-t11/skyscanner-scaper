@@ -38,8 +38,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               colorNeutral: "var(--foreground)",
               colorBorder: "var(--border)",
               fontFamily: "var(--font-dm-sans)",
-              borderRadius: "0.625rem",
+              borderRadius: "var(--radius-xl)",
             },
+            elements: { cardBox: { borderRadius: "var(--radius-xl)" } },
           }}
         >
           <Providers>{children}</Providers>

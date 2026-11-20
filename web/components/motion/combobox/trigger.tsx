@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronsUpDown, Search } from "lucide-react";
+import { UnfoldMoreIcon as ChevronsUpDown, SearchIcon as Search } from "@/components/icons";
 import type {
   InputHTMLAttributes,
   KeyboardEvent as ReactKeyboardEvent,

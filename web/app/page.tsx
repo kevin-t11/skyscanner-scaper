@@ -61,7 +61,7 @@ export default function Home() {
                 Search flights
                 <ArrowRightIcon className="size-4" />
               </ButtonLink>
-              <a href="#how-it-works" className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
+              <a href="#how-it-works" className="rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
                 How it works
               </a>
             </div>

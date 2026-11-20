@@ -1,7 +1,7 @@
 "use client";
 // beui.dev/components/motion/select
 
-import { Check, ChevronDown } from "lucide-react";
+import { TickIcon as Check, ChevronDownIcon as ChevronDown } from "@/components/icons";
 import {
   animate,
   type MotionValue,
@@ -40,6 +40,7 @@ const UNFOLD_SPRING = {
 // Exits are faster than entrances: the panel folds back on a short ease.
 const UNFOLD_EXIT = { duration: 0.2, ease: EASE_OUT } as const;
 const RADIUS = 10;
+const PANEL_RADIUS = 14;
 // How far the open panel sits from the trigger once it has pulled away.
 const GAP = 8;
 // The surface starts as a thin lip flush against the trigger's edge.
@@ -406,11 +407,11 @@ export function SelectContent({ className, children }: SelectContentProps) {
   const fromY = ready ? (isTop ? GAP : -GAP) : 0;
   const detach = useTransform(progress, [0.4, 1], [0, 1]);
   const y = useTransform(detach, (d) => lerp(fromY, 0, d));
-  const nearRadius = useTransform(detach, (d) => (ready ? RADIUS * d : RADIUS));
+  const nearRadius = useTransform(detach, (d) => (ready ? PANEL_RADIUS * d : PANEL_RADIUS));
   const borderRadius = useTransform(nearRadius, (near) =>
     isTop
-      ? `${RADIUS}px ${RADIUS}px ${near}px ${near}px`
-      : `${near}px ${near}px ${RADIUS}px ${RADIUS}px`,
+      ? `${PANEL_RADIUS}px ${PANEL_RADIUS}px ${near}px ${near}px`
+      : `${near}px ${near}px ${PANEL_RADIUS}px ${PANEL_RADIUS}px`,
   );
   const clipPath = useTransform([progress, nearRadius], ([p, near]: number[]) => {
     if (!ready) return "none";
@@ -421,8 +422,8 @@ export function SelectContent({ className, children }: SelectContentProps) {
     const hidden = Math.max(0, (height - LIP) * (1 - reveal));
     const inset = isTop ? `${hidden}px 0 0 0` : `0 0 ${hidden}px 0`;
     const corners = isTop
-      ? `${RADIUS}px ${RADIUS}px ${near}px ${near}px`
-      : `${near}px ${near}px ${RADIUS}px ${RADIUS}px`;
+      ? `${PANEL_RADIUS}px ${PANEL_RADIUS}px ${near}px ${near}px`
+      : `${near}px ${near}px ${PANEL_RADIUS}px ${PANEL_RADIUS}px`;
     return `inset(${inset} round ${corners})`;
   });
   // The surface materialises over its first frames rather than popping in as
@@ -455,7 +456,7 @@ export function SelectContent({ className, children }: SelectContentProps) {
         marginTop: isTop ? 0 : GAP,
         marginBottom: isTop ? GAP : 0,
       }}
-      // flush against the trigger, then separates into its own rounded pill;
+      // flush against the trigger, then separates into its own rounded-xl pill;
       // sits above or below depending on available space
       className={cn(
         "absolute left-0 right-0 z-20 overflow-hidden border border-border bg-background shadow-lg",
@@ -467,7 +468,7 @@ export function SelectContent({ className, children }: SelectContentProps) {
         <motion.div
           initial={false}
           animate={open ? "show" : "hidden"}
-          className="p-1"
+          className="flex flex-col gap-1 shell-1"
         >
           {children}
         </motion.div>
@@ -511,7 +512,7 @@ export function SelectItem({
         data-listbox-id={value}
         onClick={() => ctx.select(value)}
         className={cn(
-          "flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none transition-colors",
+          "flex w-full items-center justify-between gap-2 rounded-nested px-2.5 py-1.5 text-left text-sm outline-none transition-colors",
           selected
             ? "bg-muted text-foreground"
             : "text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:bg-muted",

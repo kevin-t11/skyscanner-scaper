@@ -15,7 +15,7 @@ export function SiteHeader() {
       <div className="mx-auto grid h-14 max-w-6xl grid-cols-[1fr_auto] sm:grid-cols-[1fr_auto_1fr] items-center gap-4 px-6">
         <Link
           href="/"
-          className="justify-self-start rounded-md"
+          className="justify-self-start rounded-lg"
           aria-label="Fareline home"
         >
           <Logo />
@@ -24,12 +24,12 @@ export function SiteHeader() {
           <SharedLayoutBg
             className="w-auto flex-row items-center"
             inset={0}
-            pillClassName="rounded-md bg-muted"
+            pillClassName="rounded-lg bg-muted"
           >
             {!session && (
               <Link
                 href="/#how-it-works"
-                className="rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                className="rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
                 How it works
               </Link>
@@ -40,13 +40,12 @@ export function SiteHeader() {
           <ThemeToggle
             variant="circle"
             aria-label="Toggle theme"
-            className="size-6 rounded-md text-muted-foreground transition-colors hover:text-foreground"
-            iconClassName="size-6"
+            className="size-6 rounded-lg text-muted-foreground transition-colors hover:text-foreground"
           />
           <Show when="signed-out">
             <Link
               href="/sign-in"
-              className="rounded-md px-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+              className="rounded-lg px-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
               Log in
             </Link>

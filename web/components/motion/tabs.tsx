@@ -1,7 +1,7 @@
 "use client";
 // beui.dev/components/motion/tabs
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight } from "@/components/icons";
 import { cancelFrame, frame, motion, MotionConfig, useReducedMotion, useSpring, type MotionValue, type Transition } from "motion/react";
 import {
   createContext,
@@ -198,7 +198,7 @@ export function Tabs({
 const listClasses: Record<Variant, string> = {
   pill: "inline-flex items-center gap-1 rounded-full bg-card p-1",
   underline: "inline-flex items-center gap-1 border-b border-border",
-  segment: "inline-flex items-center gap-0 rounded-lg bg-card p-0.5",
+  segment: "inline-flex items-center gap-0 bg-card shell-0.5/lg",
 };
 
 export function TabsList({
@@ -305,7 +305,7 @@ export function TabsList({
       const box = {
         x: target.offsetLeft,
         y: target.offsetTop,
-        // Fractional: a rounded width leaves the pill a hair off its tab.
+        // Fractional: a rounded-xl width leaves the pill a hair off its tab.
         width: target.getBoundingClientRect().width,
         height: target.offsetHeight,
       };
@@ -580,7 +580,7 @@ export function TabsTrigger({
     );
   }
 
-  const radius = variant === "pill" ? "rounded-full" : "rounded-md";
+  const radius = variant === "pill" ? "rounded-full" : variant === "segment" ? "rounded-nested" : "rounded-md";
   // Tracked pills are placed in the list, so this wrapper must not be their
   // containing block. Server HTML can't measure, so until the first
   // measurement the pill fills the selected tab with CSS, like the others.
@@ -678,7 +678,7 @@ export function TabsContent({ value, children, className }: { value: string; chi
       initial={{ opacity: 0, y: reduce ? 0 : 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18, ease: EASE_OUT }}
-      className={cn("mt-4 outline-none focus-visible:ring-2 focus-visible:ring-ring/40 rounded-md", className)}
+      className={cn("mt-4 outline-none focus-visible:ring-2 focus-visible:ring-ring/40 rounded-lg", className)}
     >
       {children}
     </motion.div>

@@ -29,12 +29,19 @@
   --color-ring: var(--ring);
   --color-line: var(--line);
 
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.625rem;
-  --radius-xl: 0.875rem;
-  --radius-2xl: 1.125rem;
-  --radius-3xl: 1.5rem;
+  --radius-xs: calc(var(--radius) * 0.4);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Base corner radius; the whole --radius-* scale derives from it (rounded-xl = 1.4×). */
+:root {
+  --radius: 0.625rem;
 }
 
 /* Motion tokens (transitions.dev scale) */
@@ -103,6 +110,16 @@
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: "ss01";
   }
+  button:not(:disabled),
+  [role="button"],
+  [role="option"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="menuitemradio"],
+  summary,
+  a[href] {
+    cursor: pointer;
+  }
   ::selection {
     @apply bg-foreground text-background;
   }
@@ -128,4 +145,23 @@
   @media (prefers-reduced-motion: reduce) {
     .skeleton, .rise-in { animation: none; }
   }
+}
+
+/*
+  Concentric corners: outer radius = inner radius + padding.
+  A shell owns its padding and radius (`shell-1` = 4px padding, radius-xl;
+  `shell-0.5/lg` = 2px padding, radius-lg). Anything inside it that draws its own
+  rounded surface (hover fill, selected row, tab indicator) uses `rounded-nested`.
+*/
+@utility shell-* {
+  --shell-pad: --spacing(--value(number));
+  --shell-pad: --value([length]);
+  --shell-radius: var(--radius-xl);
+  --shell-radius: --modifier(--radius-*, [length]);
+  padding: var(--shell-pad);
+  border-radius: var(--shell-radius);
+}
+
+@utility rounded-nested {
+  border-radius: max(2px, calc(var(--shell-radius, var(--radius-xl)) - var(--shell-pad, 0px)));
 }

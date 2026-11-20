@@ -1,7 +1,7 @@
 "use client";
 // beui.dev/components/motion/dropdown-menu
 
-import { Check, ChevronRight } from "lucide-react";
+import { TickIcon as Check, ChevronRightIcon as ChevronRight } from "@/components/icons";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "motion/react";
 import {
   cloneElement,
@@ -570,7 +570,7 @@ function MenuPanel({
         visibility: placement ? undefined : "hidden",
       }}
       className={cn(
-        "fixed z-[100] min-w-48 overflow-y-auto overscroll-contain rounded-xl border border-border bg-background p-1 text-foreground shadow-[0_8px_24px_-8px_rgb(0_0_0/0.16)] outline-none",
+        "fixed z-[100] min-w-48 overflow-y-auto overscroll-contain border border-border bg-background shell-1 text-foreground shadow-[0_8px_24px_-8px_rgb(0_0_0/0.16)] outline-none",
         parent && "z-[101]",
         className,
       )}
@@ -759,7 +759,7 @@ function ItemBase({
         if (closeOnSelect) root.setOpen(false);
       }}
       className={cn(
-        "relative isolate flex w-full cursor-default select-none items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm outline-none",
+        "relative isolate flex w-full cursor-default select-none items-center gap-2 rounded-nested px-2 py-1.5 text-left text-sm outline-none",
         "[&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0",
         inset && "pl-8",
         disabled && "opacity-50",
@@ -772,7 +772,7 @@ function ItemBase({
           aria-hidden="true"
           layoutId={`${level.levelId}-highlight`}
           className={cn(
-            "absolute inset-0 -z-10 rounded-lg",
+            "absolute inset-0 -z-10 rounded-nested",
             tone === "destructive" ? "bg-destructive/10" : "bg-foreground/[0.07]",
           )}
           transition={root.reduce ? { duration: 0 } : SPRING_LAYOUT}

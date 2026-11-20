@@ -51,7 +51,7 @@ export function PlaceField({ label, direction, value, onChange }: PlaceFieldProp
       try {
         const res = await fetch(`/api/places?${new URLSearchParams({ q, type: direction })}`, { signal: controller.signal });
         const body = (await res.json()) as { places?: Place[] };
-        const next = body.places ?? [];
+        const next = (body.places ?? []).filter((place, i, all) => all.findIndex((p) => p.code === place.code) === i);
         cache.current.set(q.toLowerCase(), next);
         setPlaces(next);
       } catch {
@@ -91,25 +91,42 @@ export function PlaceField({ label, direction, value, onChange }: PlaceFieldProp
         <ComboboxTrigger className="w-full">
           <ComboboxInput aria-label={label} placeholder="City or airport" />
         </ComboboxTrigger>
-        <ComboboxContent className="w-[var(--anchor-width,20rem)] min-w-72">
+        <ComboboxContent sideOffset={4}>
+          {loading && places.length > 0 ? (
+            <p aria-live="polite" className="px-3 pt-2 text-xs text-muted-foreground">Searching…</p>
+          ) : null}
           <ComboboxList ariaLabel={`${label} suggestions`}>
-            {places.map((place) => (
-              <ComboboxItem key={place.code} value={place.code} textValue={place.name} keywords={[place.code, place.city, place.country]}>
-                <span className="flex w-full items-center justify-between gap-3">
-                  <span className="min-w-0 truncate">
-                    {place.name}
-                    <span className="ml-1.5 text-muted-foreground">
-                      {place.type === "city" ? "all airports" : place.city !== place.name ? place.city : ""}
-                      {place.type === "city" || place.city !== place.name ? " · " : ""}
-                      {place.country}
+            {places
+              .filter((place, i, all) => all.findIndex((p) => p.code === place.code) === i)
+              .map((place) => {
+                const detail = [place.type === "city" ? null : place.city !== place.name ? place.city : null, place.country]
+                  .filter(Boolean)
+                  .join(" · ");
+                return (
+                  <ComboboxItem
+                    key={place.code}
+                    value={place.code}
+                    textValue={place.name}
+                    keywords={[place.code, place.city, place.country]}
+                    className="cursor-pointer"
+                  >
+                    <span className="flex w-full min-w-0 items-center gap-3" title={`${place.name} · ${detail} (${place.code})`}>
+                      <span className="min-w-0 flex-1 truncate">
+                        <span className={place.type === "city" ? "font-medium text-foreground" : undefined}>{place.name}</span>
+                        <span className="ml-1.5 text-muted-foreground">{detail}</span>
+                      </span>
+                      {place.type === "city" ? (
+                        <span className="shrink-0 rounded-xl border border-border px-1.5 py-0.5 text-[11px] leading-none text-muted-foreground">
+                          All airports
+                        </span>
+                      ) : null}
+                      <span className="w-10 shrink-0 text-right font-mono text-xs text-muted-foreground">{place.code}</span>
                     </span>
-                  </span>
-                  <span className="font-mono text-xs text-muted-foreground">{place.code}</span>
-                </span>
-              </ComboboxItem>
-            ))}
+                  </ComboboxItem>
+                );
+              })}
           </ComboboxList>
-          <ComboboxEmpty>{loading ? "Searching" : query.trim().length < 2 ? "Type two letters" : "No matches"}</ComboboxEmpty>
+          <ComboboxEmpty>{loading ? "Searching…" : query.trim().length < 2 ? "Type two letters" : "No matches"}</ComboboxEmpty>
         </ComboboxContent>
       </Combobox>
     </div>

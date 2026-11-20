@@ -73,8 +73,10 @@ export async function autosuggestInPage(args: {
 }
 
 export function normalizePlaces(raw: RawPlace[]): Place[] {
+  const seen = new Set<string>();
   return raw.flatMap((place): Place[] => {
-    if (!place.PlaceId || !place.GeoId) return [];
+    if (!place.PlaceId || !place.GeoId || seen.has(place.PlaceId)) return [];
+    seen.add(place.PlaceId);
     const type: PlaceType =
       place.PlaceId === place.CountryId ? "country" : place.PlaceId === place.CityId ? "city" : "airport";
     return [
