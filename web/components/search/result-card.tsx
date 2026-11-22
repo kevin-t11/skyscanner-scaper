@@ -13,9 +13,11 @@ import {
 
 export function ResultCard({
   itinerary,
+  currency,
   badge,
 }: {
   itinerary: Itinerary;
+  currency: string;
   badge?: string;
 }) {
   const [outbound, inbound] = itinerary.legs;
@@ -72,7 +74,7 @@ export function ResultCard({
         </span>
       </button>
       <MorphingModal viewId={view} onClose={() => setView(null)} className="max-w-4xl">
-        <FlightDetails itinerary={itinerary} onClose={() => setView(null)} />
+        <FlightDetails itinerary={itinerary} currency={currency} onClose={() => setView(null)} />
       </MorphingModal>
     </>
   );

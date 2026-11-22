@@ -60,6 +60,7 @@ curl localhost:8000/search -H 'content-type: application/json' \
 | `cabinClass` | no | `economy` (default), `premium_economy`, `business`, `first` |
 | `adults` | no | 1 to 8, default 1 |
 | `childAges` | no | One age (0 to 17) per child, up to 8, e.g. `[0, 7]`. Under 2 is an infant on an adult's lap, so at most one per adult |
+| `currency` | no | ISO 4217 code for prices and booking links, e.g. `USD`, `EUR`. Default `INR` |
 | `max` | no | 1 to 1000 results, default 50 |
 | `sort` | no | `best` (default), `cheapest`, `fastest` |
 
@@ -69,6 +70,8 @@ curl localhost:8000/search -H 'content-type: application/json' \
 curl localhost:8000/url -H 'content-type: application/json' \
   -d '{"url":"https://www.skyscanner.co.in/transport/flights/bom/del/261215/","max":10}'
 ```
+
+`max`, `sort` and `currency` work here too.
 
 ## The response
 

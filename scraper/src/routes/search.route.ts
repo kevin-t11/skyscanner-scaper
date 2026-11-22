@@ -1,7 +1,7 @@
 /**
  * `POST /search`: a flight search from explicit fields instead of a Skyscanner URL.
  *   { "from": "BOM", "to": "NYCA", "departDate": "2026-12-15", "returnDate": "2026-12-22",
- *     "cabinClass": "economy", "adults": 1, "childAges": [0, 7], "max": 50, "sort": "best" }
+ *     "cabinClass": "economy", "adults": 1, "childAges": [0, 7], "currency": "INR", "max": 50, "sort": "best" }
  * `childAges` has one age (0-17) per child; under 2 is an infant on an adult's lap.
  * `from` / `to` are Skyscanner place codes (airport `BOM`, city `NYCA`); find them with `GET /places`.
  * Same response envelope as `/url`; `request.searchUrl` is the same search on the website.
@@ -91,7 +91,7 @@ function parseFieldsRequest(input: RawSearchInput): ParsedSearchRequest {
   const pathAndQuery = buildSearchPath(query, { from: null, to: null });
   return {
     request: { query, pathAndQuery, ...options },
-    summary: { searchUrl: `https://${SKYSCANNER_SITE.host}${pathAndQuery}`, from, to, departDate, returnDate, cabinClass: cabinName as string, adults, childAges, maxItems: options.maxItems, sorting: options.sort },
+    summary: { searchUrl: `https://${SKYSCANNER_SITE.host}${pathAndQuery}`, from, to, departDate, returnDate, cabinClass: cabinName as string, adults, childAges, maxItems: options.maxItems, sorting: options.sort, currency: options.currency },
   };
 }
 
@@ -109,7 +109,7 @@ const describeFieldsInput = (input: RawSearchInput): SearchRequestSummary => ({
 export const createSearchRoute = (context: RouteContext) =>
   createFlightSearchRoute(context, {
     path: "/search",
-    logFields: ["from", "to", "departDate", "returnDate", "cabinClass", "adults", "childAges", "sort", "max"],
+    logFields: ["from", "to", "departDate", "returnDate", "cabinClass", "adults", "childAges", "currency", "sort", "max"],
     parse: parseFieldsRequest,
     describe: describeFieldsInput,
   });

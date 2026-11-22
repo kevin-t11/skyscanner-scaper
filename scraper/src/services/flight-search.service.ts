@@ -23,6 +23,8 @@ export interface FlightSearchRequest {
   query: FlightSearchQuery;
   maxItems: number;
   sort: SortOrder;
+  /** ISO 4217 code the prices come back in, e.g. `INR`. */
+  currency: string;
   /** The website search, fetched when autocomplete does not know a code exactly (e.g. `DXBA`). */
   pathAndQuery: string;
 }
@@ -263,7 +265,8 @@ export class FlightSearchService implements FlightSearch {
     request: FlightSearchRequest,
     log: Logger,
   ): Promise<UnifiedSearchOutcome> {
-    const { market, locale, currency, searchDeadlineMs } = this.config;
+    const { market, locale, searchDeadlineMs } = this.config;
+    const { currency } = request;
     const outcome = await runUnifiedSearch(
       session.browser,
       {

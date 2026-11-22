@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/motion/button/base";
 import {
   Breadcrumb,
@@ -33,12 +33,14 @@ import {
   SearchIcon,
   SwapIcon,
 } from "@/components/icons";
+import { CurrencyField } from "@/components/search/currency-field";
 import { TravellersField } from "@/components/search/travellers-field";
 import { UrlSwitch } from "@/components/search/url-switch";
 import { DateField } from "@/components/search/date-field";
 import { PlaceField } from "@/components/search/place-field";
 import { ResultCard } from "@/components/search/result-card";
 import { ResultsSkeleton } from "@/components/search/results-skeleton";
+import { browserCurrency } from "@/lib/currency";
 import {
   CABIN_LABELS,
   sortItineraries,
@@ -59,6 +61,8 @@ const isoDate = (offsetDays: number) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
+const subscribeToNothing = () => () => {};
+
 type Status =
   | { kind: "idle" }
   | { kind: "loading" }
@@ -72,6 +76,10 @@ export function SearchApp() {
   const [dates, setDates] = useState<DateRange | null>({ from: isoDate(14) });
   const [cabin, setCabin] = useState<CabinClass>("economy");
   const [travellers, setTravellers] = useState<Travellers>({ adults: 1, childAges: [] });
+  // The browser's currency is only known on the client; the server renders the select empty.
+  const detectedCurrency = useSyncExternalStore(subscribeToNothing, browserCurrency, () => null);
+  const [pickedCurrency, setPickedCurrency] = useState<string | null>(null);
+  const currency = pickedCurrency ?? detectedCurrency;
   const [sort, setSort] = useState<SortOrder>("best");
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
@@ -96,7 +104,7 @@ export function SearchApp() {
               : null;
 
   async function search() {
-    if (missing) return;
+    if (missing || !currency) return;
     if (mode === "filters" && (!from || !to || !dates)) return;
     setStatus({ kind: "loading" });
     setPage(1);
@@ -106,7 +114,7 @@ export function SearchApp() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(
           mode === "url"
-            ? { url: url.trim(), max: MAX_RESULTS, sort: "best" }
+            ? { url: url.trim(), currency, max: MAX_RESULTS, sort: "best" }
             : {
                 from: from!.code,
                 to: to!.code,
@@ -117,6 +125,7 @@ export function SearchApp() {
                 cabinClass: cabin,
                 adults: travellers.adults,
                 ...(travellers.childAges.length ? { childAges: travellers.childAges } : {}),
+                currency,
                 max: MAX_RESULTS,
                 sort: "best",
               },
@@ -233,6 +242,7 @@ export function SearchApp() {
               Paste a Skyscanner flight search link
             </p>
           )}
+          <CurrencyField value={currency} onChange={setPickedCurrency} />
           <UrlSwitch
             checked={mode === "url"}
             onChange={(on) => setMode(on ? "url" : "filters")}
@@ -391,6 +401,7 @@ export function SearchApp() {
                 >
                   <ResultCard
                     itinerary={itinerary}
+                    currency={status.response.request.currency ?? "INR"}
                     badge={badges.get(itinerary.id)}
                   />
                 </li>
