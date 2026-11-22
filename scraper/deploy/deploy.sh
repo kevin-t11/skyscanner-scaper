@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs and (re)starts the scraper as the `skyscanner` systemd service on Ubuntu.
+# Deploys: installs missing tools, then (re)starts the scraper as the `skyscanner` systemd service on Ubuntu.
 # Run from the repository folder; safe to re-run after `git pull`.
 # Settings come only from .env: the first run creates it from .env.example and stops.
 set -euo pipefail
@@ -8,9 +8,11 @@ APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUN="$HOME/.bun/bin/bun"
 cd "$APP_DIR"
 
-echo "==> packages (xvfb, Google Chrome, Bun)"
-sudo apt-get update -qq
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl unzip xvfb >/dev/null
+echo "==> packages (xvfb, Google Chrome, Bun; skipped when installed)"
+if ! command -v curl >/dev/null || ! command -v unzip >/dev/null || ! command -v Xvfb >/dev/null; then
+  sudo apt-get update -qq
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl unzip xvfb >/dev/null
+fi
 if ! command -v google-chrome >/dev/null; then
   curl -fsSL -o /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/chrome.deb >/dev/null
@@ -26,7 +28,7 @@ if [ ! -f .env ]; then
   sed -i -E "s/^API_KEY=[^#]*/API_KEY=$(openssl rand -hex 16)   /" .env
   chmod 600 .env
   echo "==> created .env with a generated API_KEY; set PROXY_URL and POOL_SIZE, then run this again:"
-  echo "    nano $APP_DIR/.env && bash deploy/install.sh"
+  echo "    nano $APP_DIR/.env && bash deploy/deploy.sh"
   exit 0
 fi
 
