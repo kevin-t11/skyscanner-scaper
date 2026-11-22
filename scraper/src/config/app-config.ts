@@ -8,7 +8,32 @@ import { parseLoggingEnabled } from "../utils/logger";
 import { readDotEnv } from "./dotenv";
 
 /** Skyscanner site and market every session uses; results are priced in this currency. */
-export const SKYSCANNER_SITE = { host: "www.skyscanner.co.in", market: "IN", locale: "en-GB", currency: "INR" } as const;
+export const SKYSCANNER_SITE = {
+  host: "www.skyscanner.co.in",
+  market: "IN",
+  locale: "en-GB",
+  currency: "INR",
+} as const;
+
+// Other Skyscanner sites (from the "International Sites" selector); swap one in for the object above.
+// Skyscanner uses "UK" (not "GB") as the United Kingdom market code.
+// { host: "www.skyscanner.co.in", market: "IN", locale: "en-GB", currency: "INR" } // India
+// { host: "www.skyscanner.com", market: "US", locale: "en-US", currency: "USD" } // USA
+// { host: "www.skyscanner.net", market: "UK", locale: "en-GB", currency: "GBP" } // United Kingdom
+// { host: "www.skyscanner.com.au", market: "AU", locale: "en-GB", currency: "AUD" } // Australia
+// { host: "www.skyscanner.co.nz", market: "NZ", locale: "en-GB", currency: "NZD" } // New Zealand
+// { host: "www.skyscanner.com.sg", market: "SG", locale: "en-GB", currency: "SGD" } // Singapore
+// { host: "www.skyscanner.com.my", market: "MY", locale: "en-GB", currency: "MYR" } // Malaysia
+// { host: "www.skyscanner.com.ph", market: "PH", locale: "en-GB", currency: "PHP" } // Philippines
+// { host: "www.skyscanner.ae", market: "AE", locale: "en-GB", currency: "AED" } // United Arab Emirates
+// { host: "www.skyscanner.co.id", market: "ID", locale: "id-ID", currency: "IDR" } // Indonesia
+// { host: "www.skyscanner.co.th", market: "TH", locale: "th-TH", currency: "THB" } // Thailand
+// { host: "www.skyscanner.com.vn", market: "VN", locale: "vi-VN", currency: "VND" } // Vietnam
+// { host: "www.skyscanner.com.hk", market: "HK", locale: "zh-HK", currency: "HKD" } // Hong Kong
+// { host: "www.skyscanner.com.tw", market: "TW", locale: "zh-TW", currency: "TWD" } // Taiwan
+// { host: "www.skyscanner.jp", market: "JP", locale: "ja-JP", currency: "JPY" } // Japan
+// { host: "www.skyscanner.co.kr", market: "KR", locale: "ko-KR", currency: "KRW" } // South Korea
+// { host: "www.skyscanner.com.mx", market: "MX", locale: "es-MX", currency: "MXN" } // Mexico
 
 /** Upper bound for one search, including all polls; partial results are returned after it. */
 const SEARCH_DEADLINE_MS = 12_000;
@@ -57,7 +82,8 @@ const positiveInt = (value: string | undefined, fallback: number): number => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
-const findChrome = () => CHROME_CANDIDATES.find((path) => existsSync(path)) ?? "google-chrome";
+const findChrome = () =>
+  CHROME_CANDIDATES.find((path) => existsSync(path)) ?? "google-chrome";
 
 /** Settings come only from `.env` in the working directory; shell and systemd variables are ignored. */
 export function loadAppConfig(env: Env = readDotEnv()): AppConfig {
