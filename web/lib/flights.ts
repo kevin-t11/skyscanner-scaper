@@ -65,6 +65,7 @@ export interface SearchRequest {
   cabinClass: CabinClass;
   adults: number;
   childAges?: number[];
+  currency: string;
   max: number;
   sort: SortOrder;
 }
@@ -72,7 +73,8 @@ export interface SearchRequest {
 export interface SearchResponse {
   status: "pass" | "fail";
   timeElapsedMs: number;
-  request: { searchUrl?: string };
+  /** `currency` is missing from scrapers that predate it, which price in INR. */
+  request: { searchUrl?: string; currency?: string };
   result: {
     complete: boolean;
     counts: { total: number; failed: number; returned: number };

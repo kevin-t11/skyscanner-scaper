@@ -16,6 +16,7 @@ import { saveSearchOutput } from "../utils/output-writer";
 import type { FlightSearchRequest, FlightSearchResult, RoutePlaces, SearchTimings } from "../services/flight-search.service";
 import { SORT_ORDERS, type Itinerary, type SortOrder } from "../types/itinerary";
 import { parseSearchUrl, type FlightSearchQuery } from "../parsers/search-url";
+import { SKYSCANNER_SITE } from "../config/app-config";
 import type { RouteContext } from "./route-context";
 
 // ── request ──
@@ -23,6 +24,7 @@ import type { RouteContext } from "./route-context";
 const DEFAULT_MAX_ITEMS = 50;
 const MAX_ITEMS_LIMIT = 1_000;
 const DEFAULT_SORT: SortOrder = "best";
+const CURRENCIES = new Set(Intl.supportedValuesOf("currency"));
 
 export class InvalidRequestError extends Error {}
 
@@ -36,8 +38,8 @@ export interface ParsedSearchRequest {
 
 const isBlank = (value: unknown) => value === undefined || value === null || value === "";
 
-/** Validates `max` / `sort` (shared by `/url` and `/search`) and applies defaults. */
-export function parseListOptions(input: RawSearchInput): Pick<FlightSearchRequest, "maxItems" | "sort"> {
+/** Validates `max` / `sort` / `currency` (shared by `/url` and `/search`) and applies defaults. */
+export function parseListOptions(input: RawSearchInput): Pick<FlightSearchRequest, "maxItems" | "sort" | "currency"> {
   const maxItems = isBlank(input.max) ? DEFAULT_MAX_ITEMS : typeof input.max === "number" || typeof input.max === "string" ? Number(input.max) : NaN;
   if (!Number.isInteger(maxItems) || maxItems < 1 || maxItems > MAX_ITEMS_LIMIT) {
     throw new InvalidRequestError(`\`max\` must be an integer 1..${MAX_ITEMS_LIMIT}`);
@@ -46,15 +48,18 @@ export function parseListOptions(input: RawSearchInput): Pick<FlightSearchReques
   if (!SORT_ORDERS.includes(sort as SortOrder)) {
     throw new InvalidRequestError(`\`sort\` must be one of ${SORT_ORDERS.join(", ")}`);
   }
-  return { maxItems, sort: sort as SortOrder };
+  const currency = isBlank(input.currency) ? SKYSCANNER_SITE.currency : typeof input.currency === "string" ? input.currency.trim().toUpperCase() : "";
+  if (!CURRENCIES.has(currency)) throw new InvalidRequestError("`currency` must be an ISO 4217 code, e.g. INR, USD, EUR");
+  return { maxItems, sort: sort as SortOrder, currency };
 }
 
-/** Best-effort echo of `max` / `sort` for a failure envelope when the input was invalid; never throws. */
-export function describeListOptions(input: RawSearchInput): Pick<SearchRequestSummary, "maxItems" | "sorting"> {
+/** Best-effort echo of `max` / `sort` / `currency` for a failure envelope when the input was invalid; never throws. */
+export function describeListOptions(input: RawSearchInput): Pick<SearchRequestSummary, "maxItems" | "sorting" | "currency"> {
   const max = isBlank(input.max) ? DEFAULT_MAX_ITEMS : typeof input.max === "number" ? input.max : typeof input.max === "string" ? Number(input.max) : NaN;
   return {
     maxItems: Number.isFinite(max) ? max : null,
     sorting: isBlank(input.sort) ? DEFAULT_SORT : typeof input.sort === "string" ? input.sort : null,
+    currency: isBlank(input.currency) ? SKYSCANNER_SITE.currency : textOrNull(input.currency),
   };
 }
 
@@ -66,7 +71,7 @@ function parseSearchRequest(input: RawSearchInput): ParsedSearchRequest {
   if (typeof searchUrl !== "string" || !searchUrl) throw new InvalidRequestError("`url` is required");
   const { query, pathAndQuery } = parseSearchUrl(searchUrl); // fail fast, before a browser session is taken
   const options = parseListOptions(input);
-  return { request: { query, pathAndQuery, ...options }, summary: { searchUrl, maxItems: options.maxItems, sorting: options.sort } };
+  return { request: { query, pathAndQuery, ...options }, summary: { searchUrl, maxItems: options.maxItems, sorting: options.sort, currency: options.currency } };
 }
 
 const describeUrlInput = (input: RawSearchInput): SearchRequestSummary => ({ searchUrl: textOrNull(input.url), ...describeListOptions(input) });
@@ -84,6 +89,7 @@ export interface SearchFailure {
 export interface SearchRequestSummary {
   maxItems: number | null;
   sorting: string | null;
+  currency: string | null;
   /** Route-specific fields: `searchUrl` for `/url`; `from`, `to`, dates, cabin, adults, child ages for `/search`. */
   [field: string]: string | number | unknown[] | null;
 }
@@ -250,4 +256,4 @@ export function createFlightSearchRoute({ search, apiKey, outputDir }: RouteCont
 }
 
 export const createUrlRoute = (context: RouteContext) =>
-  createFlightSearchRoute(context, { path: "/url", logFields: ["sort", "max", "url"], parse: parseSearchRequest, describe: describeUrlInput });
+  createFlightSearchRoute(context, { path: "/url", logFields: ["sort", "max", "currency", "url"], parse: parseSearchRequest, describe: describeUrlInput });

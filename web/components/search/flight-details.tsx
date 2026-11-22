@@ -7,9 +7,8 @@ import { ExternalLinkIcon } from "@/components/icons";
 import { MODAL_ACTIONS, MODAL_DESCRIPTION, MODAL_TITLE } from "@/components/motion/modal-styles";
 import { MorphingModalDialog } from "@/components/motion/morphing-modal";
 import { cn } from "@/lib/utils";
+import { formatPrice } from "@/lib/currency";
 import { formatDay, formatDuration, formatTime, stopsLabel, type Itinerary, type Leg } from "@/lib/flights";
-
-const inr = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
 
 // Skyscanner times are airport-local without an offset; read them as UTC so the
 // viewer's own timezone (and its DST changes) can't shift the difference.
@@ -72,7 +71,15 @@ function LegDetails({ leg, title }: { leg: Leg; title: string }) {
   );
 }
 
-export function FlightDetails({ itinerary, onClose }: { itinerary: Itinerary; onClose: () => void }) {
+export function FlightDetails({
+  itinerary,
+  currency,
+  onClose,
+}: {
+  itinerary: Itinerary;
+  currency: string;
+  onClose: () => void;
+}) {
   const titleId = useId();
   const descriptionId = useId();
   const first = itinerary.legs[0];
@@ -138,7 +145,7 @@ export function FlightDetails({ itinerary, onClose }: { itinerary: Itinerary; on
                   {option.agentName}
                 </span>
                 <span className="flex shrink-0 items-center gap-3">
-                  <span className="font-mono tabular-nums">{option.price ? inr.format(option.price) : "—"}</span>
+                  <span className="font-mono tabular-nums">{option.price ? formatPrice(option.price, currency) : "—"}</span>
                   <ButtonLink href={option.url} target="_blank" rel="noreferrer" size="sm" variant="outline">
                     Book
                     <ExternalLinkIcon className="size-3.5" />
