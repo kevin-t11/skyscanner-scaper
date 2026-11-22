@@ -59,6 +59,7 @@ curl localhost:8000/search -H 'content-type: application/json' \
 | `returnDate` | no | Leave out for one way |
 | `cabinClass` | no | `economy` (default), `premium_economy`, `business`, `first` |
 | `adults` | no | 1 to 8, default 1 |
+| `childAges` | no | One age (0 to 17) per child, up to 8, e.g. `[0, 7]`. Under 2 is an infant on an adult's lap, so at most one per adult |
 | `max` | no | 1 to 1000 results, default 50 |
 | `sort` | no | `best` (default), `cheapest`, `fastest` |
 

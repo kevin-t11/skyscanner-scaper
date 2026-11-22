@@ -49,6 +49,14 @@ export interface Itinerary {
   bookingOptions: { agentId: string; agentName: string; price: number; url: string }[];
 }
 
+/** Skyscanner prices a child under 2 as an infant, travelling on an adult's lap. */
+export const INFANT_AGE_LIMIT = 2;
+
+export interface Travellers {
+  adults: number;
+  childAges: number[];
+}
+
 export interface SearchRequest {
   from: string;
   to: string;
@@ -56,6 +64,7 @@ export interface SearchRequest {
   returnDate?: string;
   cabinClass: CabinClass;
   adults: number;
+  childAges?: number[];
   max: number;
   sort: SortOrder;
 }
