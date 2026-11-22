@@ -15,9 +15,9 @@ publishes it on port 80. Settings live only in the VM's `.env`, which is never c
 ```bash
 git clone https://github.com/kevin-t11/skyscanner-scaper.git ~/skyscanner-scaper
 cd ~/skyscanner-scaper/scraper
-bash deploy/install.sh     # installs xvfb, Chrome, Bun; creates .env with a generated API_KEY; stops
+bash deploy/deploy.sh     # installs xvfb, Chrome, Bun; creates .env with a generated API_KEY; stops
 nano .env                  # set PROXY_URL and POOL_SIZE
-bash deploy/install.sh     # installs and starts the service
+bash deploy/deploy.sh     # installs and starts the service
 bash deploy/check.sh       # waits for a ready browser, then runs one live search
 ```
 
@@ -32,7 +32,7 @@ PROXY_URL=core-residential.evomi.com:1000:USER:PASS_country-IN_session-{session}
 ```bash
 cd ~/skyscanner-scaper/scraper
 git pull
-bash deploy/install.sh
+bash deploy/deploy.sh
 bash deploy/check.sh
 ```
 
@@ -45,7 +45,7 @@ cd ~/skyscanner-scaper
 git pull
 mv .env scraper/.env
 cd scraper
-bash deploy/install.sh     # points the service at the new folder and restarts it
+bash deploy/deploy.sh     # points the service at the new folder and restarts it
 bash deploy/check.sh
 ```
 
@@ -55,10 +55,10 @@ bash deploy/check.sh
 cd ~/skyscanner-scaper/scraper
 git log --oneline -5
 git checkout <previous-commit>
-bash deploy/install.sh
+bash deploy/deploy.sh
 ```
 
-Return to the latest version with `git checkout main && git pull && bash deploy/install.sh`.
+Return to the latest version with `git checkout main && git pull && bash deploy/deploy.sh`.
 
 ## Verify
 

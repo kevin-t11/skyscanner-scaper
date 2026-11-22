@@ -33,7 +33,7 @@ import {
   SearchIcon,
   SwapIcon,
 } from "@/components/icons";
-import { AdultsStepper } from "@/components/search/adults-stepper";
+import { TravellersField } from "@/components/search/travellers-field";
 import { UrlSwitch } from "@/components/search/url-switch";
 import { DateField } from "@/components/search/date-field";
 import { PlaceField } from "@/components/search/place-field";
@@ -46,6 +46,7 @@ import {
   type Place,
   type SearchResponse,
   type SortOrder,
+  type Travellers,
 } from "@/lib/flights";
 
 const PAGE_SIZE = 10;
@@ -70,7 +71,7 @@ export function SearchApp() {
   const [trip, setTrip] = useState<"oneway" | "return">("oneway");
   const [dates, setDates] = useState<DateRange | null>({ from: isoDate(14) });
   const [cabin, setCabin] = useState<CabinClass>("economy");
-  const [adults, setAdults] = useState(1);
+  const [travellers, setTravellers] = useState<Travellers>({ adults: 1, childAges: [] });
   const [sort, setSort] = useState<SortOrder>("best");
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
@@ -114,7 +115,8 @@ export function SearchApp() {
                   ? { returnDate: dates!.to }
                   : {}),
                 cabinClass: cabin,
-                adults: Number(adults),
+                adults: travellers.adults,
+                ...(travellers.childAges.length ? { childAges: travellers.childAges } : {}),
                 max: MAX_RESULTS,
                 sort: "best",
               },
@@ -223,7 +225,7 @@ export function SearchApp() {
                     ))}
                   </SelectContent>
                 </Select>
-                <AdultsStepper value={adults} onChange={setAdults} />
+                <TravellersField value={travellers} onChange={setTravellers} />
               </div>
             </>
           ) : (

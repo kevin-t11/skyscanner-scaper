@@ -84,8 +84,8 @@ export interface SearchFailure {
 export interface SearchRequestSummary {
   maxItems: number | null;
   sorting: string | null;
-  /** Route-specific fields: `searchUrl` for `/url`; `from`, `to`, dates, cabin, adults for `/search`. */
-  [field: string]: string | number | null;
+  /** Route-specific fields: `searchUrl` for `/url`; `from`, `to`, dates, cabin, adults, child ages for `/search`. */
+  [field: string]: string | number | unknown[] | null;
 }
 
 export interface SearchResultSummary {
