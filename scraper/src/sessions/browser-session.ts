@@ -13,6 +13,11 @@ export class BrowserSession {
   /** Requests sent to Skyscanner through this session (lookups + search API calls). */
   upstreamRequests = 0;
   readonly startedAt = Date.now();
+  /** When a search last took this session; ties in `acquire` go to the least recently used. */
+  lastUsedAt = 0;
+  /** Moving average of one Skyscanner request through this session's proxy IP. */
+  latencyMs = 0;
+  latencySamples = 0;
   private closing?: Promise<void>;
 
   constructor(
@@ -27,12 +32,18 @@ export class BrowserSession {
   /** Runs `work` while counting it as in-flight on this session. */
   async run<T>(work: (browser: ChromeBrowser) => Promise<T>): Promise<T> {
     this.inflight++;
+    this.lastUsedAt = Date.now();
     try {
       return await work(this.browser);
     } finally {
       this.inflight--;
       if (this.state === "retired" && this.inflight === 0) void this.close();
     }
+  }
+
+  recordLatency(ms: number): void {
+    this.latencyMs = this.latencySamples ? Math.round((this.latencyMs + ms) / 2) : ms;
+    this.latencySamples++;
   }
 
   retire(): void {
