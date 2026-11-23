@@ -13,12 +13,16 @@ const REGION_CURRENCY: Record<string, string> = {
   PH: "PHP", KR: "KRW", ZA: "ZAR", SE: "SEK", NO: "NOK", DK: "DKK", BR: "BRL", MX: "MXN", TR: "TRY",
 };
 
+/** The currency of a two-letter country code, e.g. `IN` → INR. */
+export const regionCurrency = (region: string | null | undefined) =>
+  (region && REGION_CURRENCY[region.toUpperCase()]) || null;
+
 /** The currency of the browser's first language with a known region, e.g. `en-IN` → INR, `de` → EUR. */
 export function browserCurrency(): string {
   const languages = navigator.languages?.length ? navigator.languages : [navigator.language];
   for (const language of languages) {
-    const region = new Intl.Locale(language).maximize().region;
-    if (region && REGION_CURRENCY[region]) return REGION_CURRENCY[region];
+    const currency = regionCurrency(new Intl.Locale(language).maximize().region);
+    if (currency) return currency;
   }
   return FALLBACK_CURRENCY;
 }
