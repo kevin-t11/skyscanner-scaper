@@ -10,7 +10,9 @@ setLoggingEnabled(config.loggingEnabled);
 const log = createLogger("server");
 
 const pool = new SessionPool(config);
-const server = createHttpServer(new FlightSearchService(pool, config), () => pool.health(), {
+const flightSearch = new FlightSearchService(pool, config);
+pool.setWarmUp((session) => flightSearch.warmUp(session));
+const server = createHttpServer(flightSearch, () => pool.health(), {
   port: config.port,
   hostname: config.hostname,
   apiKey: config.apiKey,
