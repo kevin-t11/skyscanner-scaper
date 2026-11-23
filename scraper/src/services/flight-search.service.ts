@@ -9,7 +9,7 @@ import { rankItineraries, type ItineraryCounts } from "../parsers/itinerary-norm
 import { lookupRouteEntitiesInPage, toPageExpression, type RouteLookupResult } from "../skyscanner/page-scripts";
 import { isChallengeUrl, solvePressAndHold } from "../skyscanner/px-challenge";
 import { autosuggestInPage, normalizePlaces, pickPlace, type AutosuggestResult, type Place } from "../skyscanner/places";
-import { buildSearchUrl, type FlightSearchQuery } from "../parsers/search-url";
+import { buildSearchPath, buildSearchUrl, type FlightSearchQuery } from "../parsers/search-url";
 import {
   buildUnifiedSearchBody,
   buildUnifiedSearchHeaders,
@@ -75,8 +75,12 @@ const STABLE_POLLS = 1;
 const ROUTE_LOOKUP_TIMEOUT_MS = 10_000;
 const PLACES_TIMEOUT_MS = 5_000;
 const ROUTE_CACHE_LIMIT = 10_000;
-/** One retry on a fresh session after a block; more mostly burns proxy bandwidth. */
-const MAX_ATTEMPTS = 2;
+/** A blocked search moves to another session up to twice, while it can still finish within the budget. */
+const MAX_ATTEMPTS = 3;
+const RETRY_BUDGET_MS = 25_000;
+/** New sessions run this search once (search page + create) before taking real ones. */
+const WARM_UP_ROUTE = { from: "bom", to: "del" } as const;
+const WARM_UP_DAYS_AHEAD = 21;
 
 export class FlightSearchService implements FlightSearch {
   private readonly routeCache = new Map<string, ResolvedRoute>();
@@ -90,8 +94,12 @@ export class FlightSearchService implements FlightSearch {
   async search(request: FlightSearchRequest, log: Logger = createLogger("search", { timed: true })): Promise<FlightSearchResult> {
     const startedAt = performance.now();
     let challengeTried = false;
+    let lastError: Error | undefined;
     for (let attempt = 1; ; attempt++) {
-      const session = await this.pool.acquire();
+      const retryWaitMs = RETRY_BUDGET_MS - this.config.searchDeadlineMs - (performance.now() - startedAt);
+      const session = await this.pool.acquire(lastError ? Math.max(1, retryWaitMs) : undefined).catch((error) => {
+        throw lastError ?? error;
+      });
       log.info(`session ${session.id} acquired${attempt > 1 ? ` (retry ${attempt - 1})` : ""}`);
       try {
         const result = await session.run(() => this.searchOnSession(session, request, startedAt, log));
@@ -117,11 +125,32 @@ export class FlightSearchService implements FlightSearch {
         }
         log.warn(`session ${session.id} failed: ${(error as Error).message}`);
         this.pool.retire(session, (error as Error).message);
-        if (attempt >= MAX_ATTEMPTS) {
-          throw error;
-        }
+        lastError = error as Error;
+        const elapsedMs = performance.now() - startedAt;
+        if (attempt >= MAX_ATTEMPTS || elapsedMs + this.config.searchDeadlineMs > RETRY_BUDGET_MS) throw error;
       }
     }
+  }
+
+  /** Runs one search on a session that takes no work yet; throws when it is blocked, like a search would. */
+  async warmUp(session: BrowserSession): Promise<void> {
+    const departDate = new Date(Date.now() + WARM_UP_DAYS_AHEAD * 86_400_000).toISOString().slice(0, 10);
+    const query: FlightSearchQuery = { ...WARM_UP_ROUTE, dates: [departDate], adults: 1, childAges: [], cabinClass: "ECONOMY" };
+    const route = await this.lookupRouteFromPage(session, buildSearchPath(query, { from: null, to: null }), query);
+    const { market, locale, currency } = this.config;
+    const outcome = await runUnifiedSearch(session.browser, {
+      endpoint: UNIFIED_SEARCH_ENDPOINT,
+      headers: buildUnifiedSearchHeaders({ market, locale, currency }),
+      body: buildUnifiedSearchBody(query, route),
+      deadlineMs: REQUEST_TIMEOUT_MS,
+      pollIntervalMs: REQUEST_TIMEOUT_MS,
+      requestTimeoutMs: REQUEST_TIMEOUT_MS,
+      stablePolls: 0,
+    });
+    session.upstreamRequests += outcome.upstreamRequests;
+    if (outcome.httpStatus === 403) throw new SessionBlockedError("search API returned 403");
+    if (outcome.failure === "network") throw new SessionNetworkError("search API unreachable: network error");
+    if (outcome.httpStatus !== 200) throw new UpstreamError(`search API returned HTTP ${outcome.httpStatus}`);
   }
 
   async suggestPlaces(text: string, isDestination: boolean): Promise<Place[]> {

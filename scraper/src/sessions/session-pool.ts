@@ -51,6 +51,8 @@ export class SessionPool {
   /** The old session a launching replacement takes over from once it is ready. */
   private recycling: BrowserSession | null = null;
   private recycleTimer?: ReturnType<typeof setInterval>;
+  /** Runs on each new session before it takes searches; a throw fails the launch, so a blocked IP never serves one. */
+  private warmUp?: (session: BrowserSession) => Promise<void>;
 
   constructor(private readonly config: AppConfig) {}
 
@@ -61,6 +63,10 @@ export class SessionPool {
 
   private get stopped(): boolean {
     return this.shutdown.signal.aborted;
+  }
+
+  setWarmUp(warmUp: (session: BrowserSession) => Promise<void>): void {
+    this.warmUp = warmUp;
   }
 
   /** Launches `poolSize` sessions in the background; resolves when the first is ready. */
@@ -218,10 +224,12 @@ export class SessionPool {
       if (isChallengeUrl(landedUrl) && !(await solvePressAndHold(browser, createLogger(`session ${id}`)))) {
         throw new Error("challenge page not solved");
       }
+      const session = new BrowserSession(id, browser);
+      if (this.warmUp) await this.warmUp(session);
       this.warmingBrowsers.delete(browser);
       if (this.stopped) throw new Error("pool stopped");
 
-      this.sessions.add(new BrowserSession(id, browser));
+      this.sessions.add(session);
       this.consecutiveLaunchFailures = 0;
       this.counters.launched++;
       log.info(`session ${id} ready in ${formatDuration(performance.now() - launchStartedAt)} (${this.sessions.size}/${config.poolSize} ready)`);
