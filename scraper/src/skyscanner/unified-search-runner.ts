@@ -47,6 +47,8 @@ export interface UnifiedSearchOutcome {
   /** True when polling stopped because the result count stopped growing. */
   stable: boolean;
   upstreamRequests: number;
+  /** Mean time of one search API request, i.e. how fast this session's proxy is. */
+  avgRequestMs: number;
   elapsedMs: number;
   firstResultsMs: number | null;
   resultCount: number;
@@ -67,6 +69,7 @@ export async function runUnifiedSearch(
   const collect = () => page.evaluate<string>(toPageExpression(collectUnifiedSearchInPage, { stateKey }));
 
   let upstreamRequests = 0;
+  let requestMs = 0;
   let httpStatus = 0;
   let failure: UnifiedSearchOutcome["failure"];
   let timedOut = false;
@@ -78,6 +81,7 @@ export async function runUnifiedSearch(
 
   const step = async (url: string, method: "POST" | "GET", body?: string) => {
     upstreamRequests++;
+    const requestStartedAt = performance.now();
     const result = await page.evaluate<UnifiedSearchStep>(
       toPageExpression(requestUnifiedSearchStepInPage, {
         stateKey,
@@ -88,6 +92,7 @@ export async function runUnifiedSearch(
         timeoutMs: Math.max(1, Math.min(options.requestTimeoutMs, options.deadlineMs - elapsedMs())),
       }),
     );
+    requestMs += performance.now() - requestStartedAt;
     httpStatus = result.httpStatus;
     // A request cut by its own cap before the deadline is a dead connection, not a slow search.
     if (result.failure === "timeout") {
@@ -129,6 +134,7 @@ export async function runUnifiedSearch(
     timedOut,
     stable: status !== "complete" && options.stablePolls > 0 && resultCount > 0 && unchangedPolls >= options.stablePolls,
     upstreamRequests,
+    avgRequestMs: upstreamRequests ? Math.round(requestMs / upstreamRequests) : 0,
     elapsedMs: elapsedMs(),
     firstResultsMs,
     resultCount,

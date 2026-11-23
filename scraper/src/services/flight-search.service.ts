@@ -147,10 +147,12 @@ export class FlightSearchService implements FlightSearch {
     const routeLookupMs = Math.round(performance.now() - lookupStartedAt);
 
     const outcome = await this.runUnifiedSearch(session, request.query, route, request, log);
+    this.pool.recordLatency(session, outcome.avgRequestMs);
     const { counts, itineraries } = rankItineraries(outcome.payloadJson, request.sort, request.maxItems, this.pool.origin);
     const stoppedBy = outcome.complete ? "complete" : outcome.timedOut ? "deadline reached" : outcome.stable ? "stable" : "partial";
     log.info(
-      `${stoppedBy} · ${counts.passed}/${counts.received} flights parsed in ${outcome.upstreamRequests} request${outcome.upstreamRequests === 1 ? "" : "s"} · search ${formatDuration(outcome.elapsedMs)}` +
+      `${stoppedBy} · ${counts.passed}/${counts.received} flights parsed in ${outcome.upstreamRequests} request${outcome.upstreamRequests === 1 ? "" : "s"} ` +
+        `(${outcome.avgRequestMs} ms each) · search ${formatDuration(outcome.elapsedMs)}` +
         (outcome.firstResultsMs === null ? "" : `, first results ${formatDuration(outcome.firstResultsMs)}`),
     );
     return {
