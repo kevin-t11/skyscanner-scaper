@@ -13,8 +13,8 @@ import { BrowserSession } from "./browser-session";
 
 const LAUNCH_RETRY_BACKOFF_MS = [1_000, 5_000, 15_000, 60_000];
 const DEFAULT_ACQUIRE_TIMEOUT_MS = 30_000;
-/** Browsers are replaced before their sticky proxy IP expires (the proxy URL's `lifetime-30`, in minutes). */
-const SESSION_MAX_AGE_MS = 25 * 60_000;
+/** Browsers that served searches are replaced after this; idle ones are kept, so an idle pool uses no proxy traffic. */
+const SESSION_MAX_AGE_MS = 60 * 60_000;
 const RECYCLE_CHECK_MS = 30_000;
 /** A session whose requests average this slow, and 2x slower than the pool, is replaced. */
 const SLOW_REQUEST_MS = 3_000;
@@ -145,10 +145,12 @@ export class SessionPool {
     else if (!this.stopped) this.launchInBackground();
   }
 
-  /** Swaps the oldest session past its max age for a fresh one; it keeps serving until the new one is ready. */
+  /** Swaps the oldest used session past its max age for a fresh one; it keeps serving until the new one is ready. */
   private recycleOldest(): void {
     if (this.stopped || this.recycling || this.pendingLaunches.size || this.sessions.size < this.config.poolSize) return;
-    const oldest = [...this.sessions].reduce((a, b) => (b.startedAt < a.startedAt ? b : a));
+    const used = [...this.sessions].filter((session) => session.lastUsedAt > 0);
+    if (!used.length) return;
+    const oldest = used.reduce((a, b) => (b.startedAt < a.startedAt ? b : a));
     if (Date.now() - oldest.startedAt < SESSION_MAX_AGE_MS) return;
     log.info(`session ${oldest.id} is ${Math.round((Date.now() - oldest.startedAt) / 60_000)} min old; launching its replacement`);
     this.recycling = oldest;
