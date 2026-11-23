@@ -5,7 +5,7 @@ export const CURRENCIES = [
 ] as const;
 
 const FALLBACK_CURRENCY = "USD";
-const EURO_REGIONS = ["AT", "BE", "CY", "DE", "EE", "ES", "FI", "FR", "GR", "HR", "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PT", "SI", "SK"];
+const EURO_REGIONS = ["AT", "BE", "BG", "CY", "DE", "EE", "ES", "FI", "FR", "GR", "HR", "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PT", "SI", "SK"];
 const REGION_CURRENCY: Record<string, string> = {
   ...Object.fromEntries(EURO_REGIONS.map((region) => [region, "EUR"])),
   IN: "INR", US: "USD", GB: "GBP", AE: "AED", AU: "AUD", CA: "CAD", SG: "SGD", JP: "JPY", CN: "CNY",
