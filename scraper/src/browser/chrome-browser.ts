@@ -22,8 +22,11 @@ export interface ChromeLaunchOptions {
 }
 
 const BLOCKED_RESOURCE_TYPES = new Set<ResourceType>(["Image", "Media", "Font"]);
-/** Static assets come from Skyscanner's CDN; fetch them directly instead of through the paid proxy. */
-const PROXY_BYPASS_LIST = "*.skyscnr.com";
+/** Ads, tags and surveys the page loads; Ketch (consent) and New Relic stay, Skyscanner trusts the browser less without them. */
+const BLOCKED_HOSTS =
+  /(^|\.)(criteo\.com|clarity\.ms|bing\.com|doubleclick\.net|googlesyndication\.com|googleadservices\.com|googletagmanager\.com|qualtrics\.com|crcldu\.com|google\.[a-z.]+)$/;
+/** Skyscanner's static CDN and Chrome's own update/account traffic go direct instead of through the paid proxy. */
+const PROXY_BYPASS_LIST = "*.skyscnr.com;*.gvt1.com;accounts.google.com;content-autofill.googleapis.com";
 const DEVTOOLS_STARTUP_TIMEOUT_MS = 15_000;
 
 export class ChromeBrowser {
@@ -144,9 +147,9 @@ export class ChromeBrowser {
 
   /** Blocks heavy resources and answers proxy authentication challenges. */
   private async interceptRequests(proxy: ProxySettings | undefined): Promise<void> {
-    this.cdp.on("Fetch.requestPaused", ({ requestId, resourceType }, sessionId) => {
+    this.cdp.on("Fetch.requestPaused", ({ requestId, resourceType, request }, sessionId) => {
       if (sessionId !== this.pageSessionId) return;
-      const decision = BLOCKED_RESOURCE_TYPES.has(resourceType)
+      const decision = BLOCKED_RESOURCE_TYPES.has(resourceType) || isBlockedHost(request.url)
         ? this.sendToPage("Fetch.failRequest", { requestId, errorReason: "BlockedByClient" })
         : this.sendToPage("Fetch.continueRequest", { requestId });
       decision.catch(() => undefined);
@@ -160,6 +163,14 @@ export class ChromeBrowser {
       this.sendToPage("Fetch.continueWithAuth", { requestId, authChallengeResponse }).catch(() => undefined);
     });
     await this.sendToPage("Fetch.enable", { handleAuthRequests: true, patterns: [{ urlPattern: "*" }] });
+  }
+}
+
+function isBlockedHost(url: string): boolean {
+  try {
+    return BLOCKED_HOSTS.test(new URL(url).hostname);
+  } catch {
+    return false;
   }
 }
 
