@@ -69,7 +69,8 @@ type Status =
   | { kind: "done"; response: SearchResponse }
   | { kind: "error"; message: string };
 
-export function SearchApp() {
+/** `defaultCurrency` comes from the visitor's IP country; the browser language is the fallback. */
+export function SearchApp({ defaultCurrency }: { defaultCurrency: string | null }) {
   const [from, setFrom] = useState<Place | null>(null);
   const [to, setTo] = useState<Place | null>(null);
   const [trip, setTrip] = useState<"oneway" | "return">("oneway");
@@ -79,7 +80,7 @@ export function SearchApp() {
   // The browser's currency is only known on the client; the server renders the select empty.
   const detectedCurrency = useSyncExternalStore(subscribeToNothing, browserCurrency, () => null);
   const [pickedCurrency, setPickedCurrency] = useState<string | null>(null);
-  const currency = pickedCurrency ?? detectedCurrency;
+  const currency = pickedCurrency ?? defaultCurrency ?? detectedCurrency;
   const [sort, setSort] = useState<SortOrder>("best");
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
