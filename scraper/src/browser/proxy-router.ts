@@ -4,6 +4,7 @@
  * Switching a browser to `direct` closes its paid tunnels, so Chrome reconnects from the server's own IP.
  */
 import { connect, createServer, type Server, type Socket } from "node:net";
+import { connect as connectTls } from "node:tls";
 import type { ProxySettings } from "./proxy-settings";
 import type { ProxyBudget } from "./proxy-budget";
 
@@ -68,6 +69,8 @@ export class ProxyRouter {
       client.pause();
       const [method, target] = header.subarray(0, end).toString("latin1").split(" ");
       if (method !== "CONNECT" || !target) return void client.end("HTTP/1.1 405 Method Not Allowed\r\n\r\n");
+      const { port } = splitHostPort(target);
+      if (!Number.isInteger(port) || port < 1 || port > 65_535) return void client.end("HTTP/1.1 400 Bad Request\r\n\r\n");
       const head = header.subarray(end + HEADER_END.length);
       const useUpstream = this.currentRoute === "upstream" && this.upstream && !this.budget.exhausted;
       void (useUpstream ? this.tunnelUpstream(client, target, head) : this.tunnelDirect(client, target, head));
@@ -90,10 +93,18 @@ export class ProxyRouter {
     const auth = this.upstream!.username
       ? `Proxy-Authorization: Basic ${Buffer.from(`${this.upstream!.username}:${this.upstream!.password ?? ""}`).toString("base64")}\r\n`
       : "";
-    const remote = connect({ host: proxy.hostname, port: Number(proxy.port || 80), timeout: CONNECT_TIMEOUT_MS });
+    const remote =
+      proxy.protocol === "https:"
+        ? connectTls({ host: proxy.hostname, port: Number(proxy.port || 443), servername: proxy.hostname, timeout: CONNECT_TIMEOUT_MS })
+        : connect({ host: proxy.hostname, port: Number(proxy.port || 80), timeout: CONNECT_TIMEOUT_MS });
     this.upstreamTunnels.add(remote);
-    remote.on("data", (chunk) => this.budget.add(chunk.length));
-    client.on("data", (chunk) => this.budget.add(chunk.length));
+    // Past the cap even open tunnels close, so Chrome reconnects direct.
+    const count = (chunk: Buffer) => {
+      this.budget.add(chunk.length);
+      if (this.budget.exhausted) remote.destroy();
+    };
+    remote.on("data", count);
+    client.on("data", count);
     remote.once("close", () => this.upstreamTunnels.delete(remote));
     failTogether(client, remote);
     const request = `CONNECT ${target} HTTP/1.1\r\nHost: ${target}\r\n${auth}\r\n`;
