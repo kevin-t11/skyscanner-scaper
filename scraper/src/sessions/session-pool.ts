@@ -6,7 +6,7 @@
  *
  * With `PROXY_MODE=start`, a browser passes PerimeterX through the proxy and then
  * searches from this server's IP. If the server's IP gets blocked repeatedly,
- * new browsers keep the proxy for searches for a while, within the monthly cap.
+ * new browsers keep the proxy for searches for a while, within the proxy cap.
  */
 import { availableParallelism, loadavg } from "node:os";
 import { join } from "node:path";
@@ -263,7 +263,7 @@ export class SessionPool {
       this.counters.launched++;
       log.info(
         `session ${id} ready in ${formatDuration(performance.now() - launchStartedAt)}, searching ${router.route === "direct" ? "direct" : "via proxy"} ` +
-          `(${this.sessions.size}/${config.poolSize} ready · proxy ${(this.budget.usedBytes / 1e6).toFixed(1)} MB this month)`,
+          `(${this.sessions.size}/${config.poolSize} ready · proxy ${(this.budget.usedBytes / 1e6).toFixed(1)} MB used)`,
       );
       this.notifyReady();
     } catch (error) {

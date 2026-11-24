@@ -62,7 +62,7 @@ export interface AppConfig {
   proxyUrl: string | undefined;
   /** `start` (default): the proxy only warms browsers up, searches go from this server's IP. `all`: searches use it too. */
   proxyMode: "start" | "all";
-  /** Monthly cap on proxy traffic; past it every browser goes direct. */
+  /** Cap on total proxy traffic (delete `output/proxy-usage.json` to reset); past it every browser goes direct. */
   proxyLimitBytes: number;
   chromePath: string;
   /** Always false: Skyscanner's search API blocks headless Chrome. */
