@@ -67,7 +67,9 @@ export interface FlightSearch {
   suggestPlaces(text: string, isDestination: boolean): Promise<Place[]>;
 }
 
-const POLL_INTERVAL_MS = 600;
+/** The first poll waits longer: each poll re-downloads every flight found so far. */
+const FIRST_POLL_DELAY_MS = 3_000;
+const POLL_INTERVAL_MS = 2_000;
 /** Skyscanner answers a poll in ~1-2 s; a request hanging past this is a dead proxy connection. */
 const REQUEST_TIMEOUT_MS = 6_000;
 /** With STOP_WHEN_STABLE, stop after the first poll that adds no itineraries. */
@@ -306,6 +308,7 @@ export class FlightSearchService implements FlightSearch {
         body: buildUnifiedSearchBody(query, route),
         deadlineMs: searchDeadlineMs,
         pollIntervalMs: POLL_INTERVAL_MS,
+        firstPollDelayMs: FIRST_POLL_DELAY_MS,
         requestTimeoutMs: REQUEST_TIMEOUT_MS,
         stablePolls: this.config.stopWhenStable ? STABLE_POLLS : 0,
       },
