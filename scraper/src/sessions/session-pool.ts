@@ -1,8 +1,10 @@
 /**
  * Pool of warmed browser sessions. A session is retired on its first
- * PerimeterX rejection (or when Chrome exits) and replaced in the background
- * with a new proxy IP, so healthy capacity keeps serving.
+ * PerimeterX rejection, when Chrome exits or when its proxy turns slow, and
+ * replaced in the background with a new proxy IP. Healthy sessions are kept
+ * for good: a new one costs ~1.3 MB of proxy traffic to warm up.
  */
+import { availableParallelism, loadavg } from "node:os";
 import { ChromeBrowser } from "../browser/chrome-browser";
 import { proxyForSession } from "../browser/proxy-settings";
 import type { AppConfig } from "../config/app-config";
@@ -13,9 +15,6 @@ import { BrowserSession } from "./browser-session";
 
 const LAUNCH_RETRY_BACKOFF_MS = [1_000, 5_000, 15_000, 60_000];
 const DEFAULT_ACQUIRE_TIMEOUT_MS = 30_000;
-/** Browsers that served searches are replaced after this; idle ones are kept, so an idle pool uses no proxy traffic. */
-const SESSION_MAX_AGE_MS = 60 * 60_000;
-const RECYCLE_CHECK_MS = 30_000;
 /** A session whose requests average this slow, and 2x slower than the pool, is replaced. */
 const SLOW_REQUEST_MS = 3_000;
 const log = createLogger("pool");
@@ -48,9 +47,6 @@ export class SessionPool {
   private readonly counters = { launched: 0, retired: 0, launchErrors: 0 };
   private lastError: string | null = null;
   private lastSuccessAt: number | null = null;
-  /** The old session a launching replacement takes over from once it is ready. */
-  private recycling: BrowserSession | null = null;
-  private recycleTimer?: ReturnType<typeof setInterval>;
   /** Runs on each new session before it takes searches; a throw fails the launch, so a blocked IP never serves one. */
   private warmUp?: (session: BrowserSession) => Promise<void>;
 
@@ -73,7 +69,6 @@ export class SessionPool {
   async start(): Promise<void> {
     const firstReady = this.waitForReadySession();
     for (let i = 0; i < this.config.poolSize; i++) this.launchInBackground();
-    this.recycleTimer = setInterval(() => this.recycleOldest(), RECYCLE_CHECK_MS);
     await firstReady;
   }
 
@@ -135,32 +130,19 @@ export class SessionPool {
     const typicalMs = others[Math.floor(others.length / 2)];
     if (typicalMs === undefined || session.latencyMs < typicalMs * 2) return;
     if (!this.hasOtherReadySession(session)) return;
+    // On a saturated CPU every request looks slow; replacing the browser would only spend proxy traffic.
+    if ((loadavg()[0] ?? 0) >= availableParallelism()) return;
     this.retire(session, `slow proxy: ${session.latencyMs} ms per request`);
   }
 
   /** Retires a session and launches a replacement with a new proxy IP. */
-  retire(session: BrowserSession, reason: string, replace = true): void {
+  retire(session: BrowserSession, reason: string): void {
     if (!this.sessions.delete(session)) return;
     session.retire();
     this.counters.retired++;
     log.warn(`session ${session.id} retired after ${session.upstreamRequests} requests: ${reason}`);
-    if (!replace) return;
     this.lastError = `session retired: ${reason}`;
-    // A recycle replacement is already launching for this session.
-    if (session === this.recycling) this.recycling = null;
-    else if (!this.stopped) this.launchInBackground();
-  }
-
-  /** Swaps the oldest used session past its max age for a fresh one; it keeps serving until the new one is ready. */
-  private recycleOldest(): void {
-    if (this.stopped || this.recycling || this.pendingLaunches.size || this.sessions.size < this.config.poolSize) return;
-    const used = [...this.sessions].filter((session) => session.lastUsedAt > 0);
-    if (!used.length) return;
-    const oldest = used.reduce((a, b) => (b.startedAt < a.startedAt ? b : a));
-    if (Date.now() - oldest.startedAt < SESSION_MAX_AGE_MS) return;
-    log.info(`session ${oldest.id} is ${Math.round((Date.now() - oldest.startedAt) / 60_000)} min old; launching its replacement`);
-    this.recycling = oldest;
-    this.launchInBackground();
+    if (!this.stopped) this.launchInBackground();
   }
 
   health(): PoolHealth {
@@ -184,7 +166,6 @@ export class SessionPool {
 
   async stop(): Promise<void> {
     this.shutdown.abort();
-    clearInterval(this.recycleTimer);
     this.notifyReady();
     await Promise.all([...this.warmingBrowsers].map((browser) => browser.close().catch(() => undefined)));
     await Promise.all(this.pendingLaunches);
@@ -234,11 +215,6 @@ export class SessionPool {
       this.counters.launched++;
       log.info(`session ${id} ready in ${formatDuration(performance.now() - launchStartedAt)} (${this.sessions.size}/${config.poolSize} ready)`);
       this.notifyReady();
-      const recycled = this.recycling;
-      if (recycled) {
-        this.recycling = null;
-        this.retire(recycled, "max age reached", false);
-      }
     } catch (error) {
       if (browser) {
         this.warmingBrowsers.delete(browser);
