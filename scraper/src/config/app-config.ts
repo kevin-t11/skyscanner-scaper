@@ -1,6 +1,6 @@
 /**
  * Runtime configuration. Only what changes between machines comes from the `.env` file
- * (`PROXY_URL`, `PROXY_MODE`, `PROXY_LIMIT_MB`, `PORT`, `POOL_SIZE`, `API_KEY`, `LOGGING`, optional `CHROME_PATH`);
+ * (`PROXY_URL`, `PORT`, `POOL_SIZE`, `API_KEY`, `LOGGING`, optional `CHROME_PATH`);
  * everything else is a fixed setting below.
  */
 import { existsSync } from "node:fs";
@@ -60,10 +60,6 @@ export interface AppConfig {
   poolSize: number;
   /** `http://user:pass@host:port`; `{session}` is replaced with a per-browser id. */
   proxyUrl: string | undefined;
-  /** `start` (default): the proxy only warms browsers up, searches go from this server's IP. `all`: searches use it too. */
-  proxyMode: "start" | "all";
-  /** Cap on total proxy traffic (delete `output/proxy-usage.json` to reset); past it every browser goes direct. */
-  proxyLimitBytes: number;
   chromePath: string;
   /** Always false: Skyscanner's search API blocks headless Chrome. */
   headless: boolean;
@@ -97,8 +93,6 @@ export function loadAppConfig(env: Env = readDotEnv()): AppConfig {
     apiKey: env.API_KEY || undefined,
     poolSize: positiveInt(env.POOL_SIZE, 1),
     proxyUrl: env.PROXY_URL || undefined,
-    proxyMode: env.PROXY_MODE === "all" ? "all" : "start",
-    proxyLimitBytes: positiveInt(env.PROXY_LIMIT_MB, 1024) * 1_000_000,
     chromePath: env.CHROME_PATH || findChrome(),
     headless: false,
     skyscannerHost: SKYSCANNER_SITE.host,
