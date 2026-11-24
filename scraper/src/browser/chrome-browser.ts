@@ -24,7 +24,7 @@ export interface ChromeLaunchOptions {
 const BLOCKED_RESOURCE_TYPES = new Set<ResourceType>(["Image", "Media", "Font"]);
 /** Ads, tags and surveys the page loads; Ketch (consent) and New Relic stay, Skyscanner trusts the browser less without them. */
 const BLOCKED_HOSTS =
-  /(^|\.)(criteo\.com|clarity\.ms|bing\.com|doubleclick\.net|googlesyndication\.com|googleadservices\.com|googletagmanager\.com|qualtrics\.com|crcldu\.com|google\.[a-z.]+)$/;
+  /(^|\.)(criteo\.com|clarity\.ms|bing\.com|doubleclick\.net|googlesyndication\.com|googleadservices\.com|googletagmanager\.com|qualtrics\.com|crcldu\.com|google\.[a-z.]+|ketchjs\.com|ketchcdn\.com|newrelic\.com|nr-data\.net)$/;
 /** Skyscanner's static CDN and Chrome's own update/account traffic go direct instead of through the paid proxy. */
 const PROXY_BYPASS_LIST = "*.skyscnr.com;*.gvt1.com;accounts.google.com;content-autofill.googleapis.com";
 const DEVTOOLS_STARTUP_TIMEOUT_MS = 15_000;
