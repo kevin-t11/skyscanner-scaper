@@ -3,12 +3,19 @@
  * PerimeterX rejection, when Chrome exits or when its proxy turns slow, and
  * replaced in the background with a new proxy IP. Healthy sessions are kept
  * for good: a new one costs ~1.3 MB of proxy traffic to warm up.
+ *
+ * With `PROXY_MODE=start`, a browser passes PerimeterX through the proxy and then
+ * searches from this server's IP. If the server's IP gets blocked repeatedly,
+ * new browsers keep the proxy for searches for a while, within the proxy cap.
  */
 import { availableParallelism, loadavg } from "node:os";
+import { join } from "node:path";
 import { ChromeBrowser } from "../browser/chrome-browser";
+import { ProxyBudget } from "../browser/proxy-budget";
+import { ProxyRouter } from "../browser/proxy-router";
 import { proxyForSession } from "../browser/proxy-settings";
 import type { AppConfig } from "../config/app-config";
-import { NoSessionAvailableError } from "../errors";
+import { NoSessionAvailableError, SessionBlockedError } from "../errors";
 import { createLogger, formatDuration } from "../utils/logger";
 import { isChallengeUrl, solvePressAndHold } from "../skyscanner/px-challenge";
 import { BrowserSession } from "./browser-session";
@@ -17,6 +24,10 @@ const LAUNCH_RETRY_BACKOFF_MS = [1_000, 5_000, 15_000, 60_000];
 const DEFAULT_ACQUIRE_TIMEOUT_MS = 30_000;
 /** A session whose requests average this slow, and 2x slower than the pool, is replaced. */
 const SLOW_REQUEST_MS = 3_000;
+/** This many blocked direct searches within the window move searches onto the proxy for `PROXY_FALLBACK_MS`. */
+const DIRECT_BLOCK_LIMIT = 3;
+const DIRECT_BLOCK_WINDOW_MS = 10 * 60_000;
+const PROXY_FALLBACK_MS = 30 * 60_000;
 const log = createLogger("pool");
 
 /** `GET /health` body, shaped like the Zillow scraper's: a status plus pool counters. */
@@ -34,6 +45,10 @@ export interface PoolHealth {
   /** ISO time of the last search that passed. */
   last_success_at: string | null;
   proxy: boolean;
+  /** Where searches go now: `direct` (this server's IP) or `proxy`. */
+  searches_via: "direct" | "proxy";
+  proxy_mb_used: number;
+  proxy_mb_limit: number;
 }
 
 export class SessionPool {
@@ -47,10 +62,15 @@ export class SessionPool {
   private readonly counters = { launched: 0, retired: 0, launchErrors: 0 };
   private lastError: string | null = null;
   private lastSuccessAt: number | null = null;
+  private readonly budget: ProxyBudget;
+  private directBlocks: number[] = [];
+  private proxyFallbackUntil = 0;
   /** Runs on each new session before it takes searches; a throw fails the launch, so a blocked IP never serves one. */
   private warmUp?: (session: BrowserSession) => Promise<void>;
 
-  constructor(private readonly config: AppConfig) {}
+  constructor(private readonly config: AppConfig) {
+    this.budget = new ProxyBudget(config.proxyLimitBytes, join(config.outputDir, "proxy-usage.json"));
+  }
 
   /** The Skyscanner origin every session's page is on. */
   get origin(): string {
@@ -67,6 +87,7 @@ export class SessionPool {
 
   /** Launches `poolSize` sessions in the background; resolves when the first is ready. */
   async start(): Promise<void> {
+    await this.budget.load();
     const firstReady = this.waitForReadySession();
     for (let i = 0; i < this.config.poolSize; i++) this.launchInBackground();
     await firstReady;
@@ -81,9 +102,12 @@ export class SessionPool {
       }
       const usable = [...this.sessions].filter((session) => session.isUsable);
       if (usable.length) {
-        return usable.reduce((a, b) =>
+        const session = usable.reduce((a, b) =>
           b.inflight < a.inflight || (b.inflight === a.inflight && b.lastUsedAt < a.lastUsedAt) ? b : a,
         );
+        // A browser kept on the proxy during a fallback window goes back to direct once it ends.
+        if (session.router.route === "upstream" && session.inflight === 0 && this.searchesDirect) session.router.setRoute("direct");
+        return session;
       }
       const remainingMs = deadline - Date.now();
       if (remainingMs <= 0) break;
@@ -130,14 +154,17 @@ export class SessionPool {
     const typicalMs = others[Math.floor(others.length / 2)];
     if (typicalMs === undefined || session.latencyMs < typicalMs * 2) return;
     if (!this.hasOtherReadySession(session)) return;
+    // Direct sessions share this server's IP: a new browser would be no faster and its start costs proxy traffic.
+    if (session.router.route === "direct") return;
     // On a saturated CPU every request looks slow; replacing the browser would only spend proxy traffic.
     if ((loadavg()[0] ?? 0) >= availableParallelism()) return;
     this.retire(session, `slow proxy: ${session.latencyMs} ms per request`);
   }
 
-  /** Retires a session and launches a replacement with a new proxy IP. */
-  retire(session: BrowserSession, reason: string): void {
+  /** Retires a session and launches a replacement with a new proxy IP. `blocked`: PerimeterX rejected it. */
+  retire(session: BrowserSession, reason: string, blocked = false): void {
     if (!this.sessions.delete(session)) return;
+    if (blocked && session.router.route === "direct") this.recordDirectBlock();
     session.retire();
     this.counters.retired++;
     log.warn(`session ${session.id} retired after ${session.upstreamRequests} requests: ${reason}`);
@@ -161,6 +188,9 @@ export class SessionPool {
       oldest_session_age_s: sessions.length ? Math.round((Date.now() - oldestStartedAt) / 100) / 10 : null,
       last_success_at: this.lastSuccessAt ? new Date(this.lastSuccessAt).toISOString() : null,
       proxy: Boolean(this.config.proxyUrl),
+      searches_via: this.searchesDirect ? "direct" : "proxy",
+      proxy_mb_used: Math.round(this.budget.usedBytes / 10_000) / 100,
+      proxy_mb_limit: Math.round(this.budget.limitBytes / 1_000_000),
     };
   }
 
@@ -171,6 +201,22 @@ export class SessionPool {
     await Promise.all(this.pendingLaunches);
     await Promise.all([...this.sessions].map((session) => session.close()));
     this.sessions.clear();
+    await this.budget.save();
+  }
+
+  /** False while searches fall back to the proxy, or when PROXY_MODE=all; true without a proxy. */
+  private get searchesDirect(): boolean {
+    if (!this.config.proxyUrl || this.budget.exhausted) return true;
+    return this.config.proxyMode === "start" && Date.now() >= this.proxyFallbackUntil;
+  }
+
+  private recordDirectBlock(): void {
+    const now = Date.now();
+    this.directBlocks = [...this.directBlocks.filter((at) => now - at < DIRECT_BLOCK_WINDOW_MS), now];
+    if (this.directBlocks.length < DIRECT_BLOCK_LIMIT || now < this.proxyFallbackUntil) return;
+    this.proxyFallbackUntil = now + PROXY_FALLBACK_MS;
+    this.directBlocks = [];
+    log.warn(`${DIRECT_BLOCK_LIMIT} direct searches blocked in ${DIRECT_BLOCK_WINDOW_MS / 60_000} min: new browsers search through the proxy for ${PROXY_FALLBACK_MS / 60_000} min`);
   }
 
   private launchInBackground(): void {
@@ -184,15 +230,18 @@ export class SessionPool {
     if (this.stopped) return;
 
     let browser: ChromeBrowser | undefined;
+    let router: ProxyRouter | undefined;
     const launchStartedAt = performance.now();
     const { config } = this;
-    log.info(`session ${id} launching${config.proxyUrl ? " via proxy" : " without proxy"}`);
+    const upstream = this.budget.exhausted ? undefined : proxyForSession(config.proxyUrl, id);
+    log.info(`session ${id} launching${upstream ? " via proxy" : " without proxy"}`);
     try {
+      router = await ProxyRouter.start(upstream, this.budget, "upstream");
       browser = await ChromeBrowser.launch({
         chromePath: config.chromePath,
         headless: config.headless,
         locale: config.locale,
-        proxy: proxyForSession(config.proxyUrl, id),
+        proxy: { server: router.url },
       });
       this.warmingBrowsers.add(browser);
       if (this.stopped) throw new Error("pool stopped");
@@ -205,7 +254,9 @@ export class SessionPool {
       if (isChallengeUrl(landedUrl) && !(await solvePressAndHold(browser, createLogger(`session ${id}`)))) {
         throw new Error("challenge page not solved");
       }
-      const session = new BrowserSession(id, browser);
+      const session = new BrowserSession(id, browser, router);
+      // The warm-up search then checks that this server's IP is let through.
+      if (this.searchesDirect) router.setRoute("direct");
       if (this.warmUp) await this.warmUp(session);
       this.warmingBrowsers.delete(browser);
       if (this.stopped) throw new Error("pool stopped");
@@ -213,13 +264,19 @@ export class SessionPool {
       this.sessions.add(session);
       this.consecutiveLaunchFailures = 0;
       this.counters.launched++;
-      log.info(`session ${id} ready in ${formatDuration(performance.now() - launchStartedAt)} (${this.sessions.size}/${config.poolSize} ready)`);
+      log.info(
+        `session ${id} ready in ${formatDuration(performance.now() - launchStartedAt)}, searching ${router.route === "direct" ? "direct" : "via proxy"} ` +
+          `(${this.sessions.size}/${config.poolSize} ready · proxy ${(this.budget.usedBytes / 1e6).toFixed(1)} MB used)`,
+      );
       this.notifyReady();
     } catch (error) {
       if (browser) {
         this.warmingBrowsers.delete(browser);
         await browser.close().catch(() => undefined);
       }
+      // Blocked direct warm-ups count too while no browser is ready, or a blocked server IP would leave the pool empty.
+      if (error instanceof SessionBlockedError && router?.route === "direct" && !this.sessions.size) this.recordDirectBlock();
+      router?.close();
       if (this.stopped) return;
       this.consecutiveLaunchFailures++;
       this.counters.launchErrors++;
