@@ -15,7 +15,7 @@ import { ProxyBudget } from "../browser/proxy-budget";
 import { ProxyRouter } from "../browser/proxy-router";
 import { proxyForSession } from "../browser/proxy-settings";
 import type { AppConfig } from "../config/app-config";
-import { NoSessionAvailableError } from "../errors";
+import { NoSessionAvailableError, SessionBlockedError } from "../errors";
 import { createLogger, formatDuration } from "../utils/logger";
 import { isChallengeUrl, solvePressAndHold } from "../skyscanner/px-challenge";
 import { BrowserSession } from "./browser-session";
@@ -102,9 +102,12 @@ export class SessionPool {
       }
       const usable = [...this.sessions].filter((session) => session.isUsable);
       if (usable.length) {
-        return usable.reduce((a, b) =>
+        const session = usable.reduce((a, b) =>
           b.inflight < a.inflight || (b.inflight === a.inflight && b.lastUsedAt < a.lastUsedAt) ? b : a,
         );
+        // A browser kept on the proxy during a fallback window goes back to direct once it ends.
+        if (session.router.route === "upstream" && session.inflight === 0 && this.searchesDirect) session.router.setRoute("direct");
+        return session;
       }
       const remainingMs = deadline - Date.now();
       if (remainingMs <= 0) break;
@@ -271,6 +274,8 @@ export class SessionPool {
         this.warmingBrowsers.delete(browser);
         await browser.close().catch(() => undefined);
       }
+      // Blocked direct warm-ups count too while no browser is ready, or a blocked server IP would leave the pool empty.
+      if (error instanceof SessionBlockedError && router?.route === "direct" && !this.sessions.size) this.recordDirectBlock();
       router?.close();
       if (this.stopped) return;
       this.consecutiveLaunchFailures++;
