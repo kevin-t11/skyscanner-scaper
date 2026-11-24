@@ -21,6 +21,8 @@ export interface UnifiedSearchOptions {
   body: UnifiedSearchRequestBody;
   deadlineMs: number;
   pollIntervalMs: number;
+  /** Wait before the first poll; defaults to `pollIntervalMs`. */
+  firstPollDelayMs?: number;
   /** Cap for one create/poll request; a request that hangs past it is a dead connection (e.g. proxy). */
   requestTimeoutMs: number;
   /** Stop once this many polls in a row add no itineraries (0 = wait for `complete`). */
@@ -115,11 +117,12 @@ export async function runUnifiedSearch(
     await step(options.endpoint, "POST", JSON.stringify(options.body));
     const stable = () => options.stablePolls > 0 && resultCount > 0 && unchangedPolls >= options.stablePolls;
     while (httpStatus === 200 && !failure && !timedOut && status !== "complete" && sessionId && !stable()) {
-      if (elapsedMs() + options.pollIntervalMs > options.deadlineMs) {
+      const waitMs = upstreamRequests === 1 ? (options.firstPollDelayMs ?? options.pollIntervalMs) : options.pollIntervalMs;
+      if (elapsedMs() + waitMs > options.deadlineMs) {
         timedOut = true;
         break;
       }
-      await sleep(options.pollIntervalMs);
+      await sleep(waitMs);
       await step(options.endpoint + encodeURIComponent(sessionId), "GET");
     }
   } catch (error) {
