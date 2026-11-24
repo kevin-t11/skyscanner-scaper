@@ -22,7 +22,7 @@ Chrome opens visibly on purpose: Skyscanner blocks headless Chrome. On a server 
 | Name | Default | What it does |
 |---|---|---|
 | `PROXY_URL` | empty | Residential proxy. `{session}` gives each browser its own sticky IP |
-| `POOL_SIZE` | `1` | Browsers kept open. More browsers = more searches at once (~300 MB each). Searches rotate across them; a used one is replaced after 60 min or when its proxy turns slow |
+| `POOL_SIZE` | `1` | Browsers kept open. More browsers = more searches at once (~300 MB each). Searches rotate across them; one is replaced only when blocked or when its proxy turns slow |
 | `API_KEY` | empty | When set, every request needs an `x-api-key` header |
 | `PORT` | `8000` | HTTP port |
 | `STOP_WHEN_STABLE` | `enabled` | Return as soon as no new flights arrive, instead of waiting for Skyscanner's "complete" |
