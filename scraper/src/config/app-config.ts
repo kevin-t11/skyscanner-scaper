@@ -62,6 +62,8 @@ export interface AppConfig {
   proxyUrl: string | undefined;
   /** `start` (default): the proxy only warms browsers up, searches go from this server's IP. `all`: searches use it too. */
   proxyMode: "start" | "all";
+  /** In `start` mode, move searches onto the proxy when the server IP gets blocked. */
+  proxyFallback: boolean;
   /** Cap on total proxy traffic (delete `output/proxy-usage.json` to reset); past it every browser goes direct. */
   proxyLimitBytes: number;
   chromePath: string;
@@ -98,6 +100,7 @@ export function loadAppConfig(env: Env = readDotEnv()): AppConfig {
     poolSize: positiveInt(env.POOL_SIZE, 1),
     proxyUrl: env.PROXY_URL || undefined,
     proxyMode: env.PROXY_MODE === "all" ? "all" : "start",
+    proxyFallback: env.PROXY_FALLBACK !== "off",
     proxyLimitBytes: positiveInt(env.PROXY_LIMIT_MB, 1024) * 1_000_000,
     chromePath: env.CHROME_PATH || findChrome(),
     headless: false,

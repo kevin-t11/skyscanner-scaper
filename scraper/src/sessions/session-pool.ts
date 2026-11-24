@@ -221,6 +221,7 @@ export class SessionPool {
   }
 
   private startProxyFallback(reason: string): void {
+    if (!this.config.proxyFallback) return void log.warn(`${reason}; proxy fallback is off`);
     this.proxyFallbackUntil = Date.now() + PROXY_FALLBACK_MS;
     this.directBlocks = [];
     this.directWarmUpBlockStreak = 0;
