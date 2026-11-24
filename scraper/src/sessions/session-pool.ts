@@ -28,6 +28,8 @@ const SLOW_REQUEST_MS = 3_000;
 const DIRECT_BLOCK_LIMIT = 3;
 const DIRECT_BLOCK_WINDOW_MS = 10 * 60_000;
 const PROXY_FALLBACK_MS = 30 * 60_000;
+/** Direct warm-ups often hit one-off challenges, so only a streak of blocked ones (no browser ready between) means the IP is blocked. */
+const DIRECT_WARMUP_BLOCK_STREAK = 6;
 const log = createLogger("pool");
 
 /** `GET /health` body, shaped like the Zillow scraper's: a status plus pool counters. */
@@ -64,6 +66,7 @@ export class SessionPool {
   private lastSuccessAt: number | null = null;
   private readonly budget: ProxyBudget;
   private directBlocks: number[] = [];
+  private directWarmUpBlockStreak = 0;
   private proxyFallbackUntil = 0;
   /** Runs on each new session before it takes searches; a throw fails the launch, so a blocked IP never serves one. */
   private warmUp?: (session: BrowserSession) => Promise<void>;
@@ -214,9 +217,14 @@ export class SessionPool {
     const now = Date.now();
     this.directBlocks = [...this.directBlocks.filter((at) => now - at < DIRECT_BLOCK_WINDOW_MS), now];
     if (this.directBlocks.length < DIRECT_BLOCK_LIMIT || now < this.proxyFallbackUntil) return;
-    this.proxyFallbackUntil = now + PROXY_FALLBACK_MS;
+    this.startProxyFallback(`${DIRECT_BLOCK_LIMIT} direct searches blocked in ${DIRECT_BLOCK_WINDOW_MS / 60_000} min`);
+  }
+
+  private startProxyFallback(reason: string): void {
+    this.proxyFallbackUntil = Date.now() + PROXY_FALLBACK_MS;
     this.directBlocks = [];
-    log.warn(`${DIRECT_BLOCK_LIMIT} direct searches blocked in ${DIRECT_BLOCK_WINDOW_MS / 60_000} min: new browsers search through the proxy for ${PROXY_FALLBACK_MS / 60_000} min`);
+    this.directWarmUpBlockStreak = 0;
+    log.warn(`${reason}: new browsers search through the proxy for ${PROXY_FALLBACK_MS / 60_000} min`);
   }
 
   private launchInBackground(): void {
@@ -263,6 +271,7 @@ export class SessionPool {
 
       this.sessions.add(session);
       this.consecutiveLaunchFailures = 0;
+      if (router.route === "direct") this.directWarmUpBlockStreak = 0;
       this.counters.launched++;
       log.info(
         `session ${id} ready in ${formatDuration(performance.now() - launchStartedAt)}, searching ${router.route === "direct" ? "direct" : "via proxy"} ` +
@@ -274,8 +283,9 @@ export class SessionPool {
         this.warmingBrowsers.delete(browser);
         await browser.close().catch(() => undefined);
       }
-      // Blocked direct warm-ups count too while no browser is ready, or a blocked server IP would leave the pool empty.
-      if (error instanceof SessionBlockedError && router?.route === "direct" && !this.sessions.size) this.recordDirectBlock();
+      if (error instanceof SessionBlockedError && router?.route === "direct" && ++this.directWarmUpBlockStreak >= DIRECT_WARMUP_BLOCK_STREAK) {
+        this.startProxyFallback(`${DIRECT_WARMUP_BLOCK_STREAK} direct warm-ups blocked in a row`);
+      }
       router?.close();
       if (this.stopped) return;
       this.consecutiveLaunchFailures++;
