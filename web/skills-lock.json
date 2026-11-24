@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "skills": {
+    "make-interfaces-feel-better": {
+      "source": "Chikage0o0/opencode",
+      "commit": "f87a5e9729bb4e5eae0b5e7c055f447bc98a4da5",
+      "sourceType": "github",
+      "skillPath": "skills/make-interfaces-feel-better/SKILL.md",
+      "computedHash": "1d11c63e86a76d808fb2256226ae29ca415af08f6e3a3156664e9354308104d3"
+    }
+  }
+}
