@@ -126,7 +126,7 @@ export class FlightSearchService implements FlightSearch {
           }
         }
         log.warn(`session ${session.id} failed: ${(error as Error).message}`);
-        this.pool.retire(session, (error as Error).message);
+        this.pool.retire(session, (error as Error).message, error instanceof SessionBlockedError);
         lastError = error as Error;
         const elapsedMs = performance.now() - startedAt;
         if (attempt >= MAX_ATTEMPTS || elapsedMs + this.config.searchDeadlineMs > RETRY_BUDGET_MS) throw error;
@@ -161,7 +161,7 @@ export class FlightSearchService implements FlightSearch {
       return await session.run(() => this.placesOnSession(session, text, isDestination));
     } catch (error) {
       if (error instanceof SessionBlockedError || error instanceof SessionNetworkError || error instanceof BrowserError) {
-        this.pool.retire(session, (error as Error).message);
+        this.pool.retire(session, (error as Error).message, error instanceof SessionBlockedError);
       }
       throw error;
     }
@@ -326,7 +326,7 @@ export class FlightSearchService implements FlightSearch {
     if (outcome.httpStatus === 403) {
       // Blocked before any results: retry elsewhere. Blocked mid-search: keep what we have, retire the session.
       if (outcome.resultCount === 0) throw new SessionBlockedError("search API returned 403");
-      this.pool.retire(session, "search API returned 403 mid-search");
+      this.pool.retire(session, "search API returned 403 mid-search", true);
     } else if (outcome.failure === "malformed") {
       // Skyscanner's fault, not the session's: keep the session and any results already merged.
       if (outcome.resultCount === 0) throw new UpstreamError("search API returned invalid JSON");

@@ -1,4 +1,5 @@
 import type { ChromeBrowser } from "../browser/chrome-browser";
+import type { ProxyRouter } from "../browser/proxy-router";
 
 /** `exclusive`: one task has the page to itself (e.g. solving a challenge); searches skip it. */
 export type BrowserSessionState = "ready" | "exclusive" | "retired";
@@ -23,6 +24,7 @@ export class BrowserSession {
   constructor(
     readonly id: string,
     readonly browser: ChromeBrowser,
+    readonly router: ProxyRouter,
   ) {}
 
   get isUsable(): boolean {
@@ -52,6 +54,9 @@ export class BrowserSession {
   }
 
   close(): Promise<void> {
-    return (this.closing ??= this.browser.close().catch(() => undefined));
+    return (this.closing ??= this.browser
+      .close()
+      .catch(() => undefined)
+      .finally(() => this.router.close()));
   }
 }

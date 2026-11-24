@@ -22,6 +22,8 @@ Chrome opens visibly on purpose: Skyscanner blocks headless Chrome. On a server 
 | Name | Default | What it does |
 |---|---|---|
 | `PROXY_URL` | empty | Residential proxy. `{session}` gives each browser its own sticky IP |
+| `PROXY_MODE` | `start` | `start`: browsers pass the bot check through the proxy, then search from the server's own IP; after 3 blocked direct searches in 10 min, new browsers search through the proxy for 30 min. `all`: every search uses the proxy |
+| `PROXY_LIMIT_MB` | `1024` | Monthly cap on proxy traffic (kept in `output/proxy-usage.json`); past it, everything goes direct |
 | `POOL_SIZE` | `1` | Browsers kept open. More browsers = more searches at once (~300 MB each). Searches rotate across them; one is replaced only when blocked or when its proxy turns slow |
 | `API_KEY` | empty | When set, every request needs an `x-api-key` header |
 | `PORT` | `8000` | HTTP port |
