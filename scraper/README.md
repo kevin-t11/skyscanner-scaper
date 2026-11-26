@@ -25,7 +25,8 @@ Chrome opens visibly on purpose: Skyscanner blocks headless Chrome. On a server 
 | `POOL_SIZE` | `1` | Browsers kept open. More browsers = more searches at once (~300 MB each). Searches rotate across them; one is replaced only when blocked or when its proxy turns slow |
 | `API_KEY` | empty | When set, every request needs an `x-api-key` header |
 | `PORT` | `8000` | HTTP port |
-| `STOP_WHEN_STABLE` | `enabled` | Return as soon as no new flights arrive, instead of waiting for Skyscanner's "complete" |
+| `STOP_WHEN_STABLE` | `disabled` | `enabled` returns as soon as no new flights arrive (faster, can miss ~5% on return searches); `disabled` waits for Skyscanner's "complete" |
+| `SEARCH_DEADLINE_MS` | `30000` | Cap for one search; partial results are returned after it |
 | `LOGGING` | `enabled` | One short log line per step |
 
 ## Endpoints

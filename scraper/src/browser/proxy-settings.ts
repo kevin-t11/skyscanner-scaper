@@ -22,7 +22,8 @@ function parseProxyUrl(proxyUrl: string): ProxySettings {
   const url = URL.canParse(proxyUrl) ? new URL(proxyUrl) : undefined;
   if (!url?.hostname) throw new Error('PROXY_URL must be "http://user:pass@host:port" or "host:port:user:pass"');
   return {
-    server: `${url.protocol}//${url.hostname}:${url.port}`,
+    // `URL` drops a default port (`:80` for http), which Chrome then rejects.
+    server: `${url.protocol}//${url.hostname}:${url.port || (url.protocol === "https:" ? "443" : "80")}`,
     username: url.username ? decodeURIComponent(url.username) : undefined,
     password: url.password ? decodeURIComponent(url.password) : undefined,
   };

@@ -72,6 +72,8 @@ const FIRST_POLL_DELAY_MS = 3_000;
 const POLL_INTERVAL_MS = 2_000;
 /** Skyscanner answers a poll in ~1-2 s; a request hanging past this is a dead proxy connection. */
 const REQUEST_TIMEOUT_MS = 6_000;
+/** Late polls of big return searches re-download 2,000+ flights (several MB) and can take ~7-10 s on a slow proxy. */
+const SEARCH_REQUEST_TIMEOUT_MS = 15_000;
 /** With STOP_WHEN_STABLE, stop after the first poll that adds no itineraries. */
 const STABLE_POLLS = 1;
 const ROUTE_LOOKUP_TIMEOUT_MS = 10_000;
@@ -79,7 +81,7 @@ const PLACES_TIMEOUT_MS = 5_000;
 const ROUTE_CACHE_LIMIT = 10_000;
 /** A blocked search moves to another session up to twice, while it can still finish within the budget. */
 const MAX_ATTEMPTS = 3;
-const RETRY_BUDGET_MS = 25_000;
+const RETRY_BUDGET_MS = 70_000;
 /** New sessions run this search once (search page + create) before taking real ones. */
 const WARM_UP_ROUTE = { from: "bom", to: "del" } as const;
 const WARM_UP_DAYS_AHEAD = 21;
@@ -309,7 +311,7 @@ export class FlightSearchService implements FlightSearch {
         deadlineMs: searchDeadlineMs,
         pollIntervalMs: POLL_INTERVAL_MS,
         firstPollDelayMs: FIRST_POLL_DELAY_MS,
-        requestTimeoutMs: REQUEST_TIMEOUT_MS,
+        requestTimeoutMs: SEARCH_REQUEST_TIMEOUT_MS,
         stablePolls: this.config.stopWhenStable ? STABLE_POLLS : 0,
       },
       ({ step, status, resultCount, newResults }) => {
