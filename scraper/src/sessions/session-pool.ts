@@ -128,6 +128,7 @@ export class SessionPool {
   /** Records a search that passed; after `proxyRotateAfter` searches a `{slot}` or fallback browser moves to the next free IP. */
   recordSuccess(session: BrowserSession): void {
     this.lastSuccessAt = Date.now();
+    if (!this.sessions.has(session)) return;
     const searches = (this.sessionSearches.get(session) ?? 0) + 1;
     this.sessionSearches.set(session, searches);
     const { proxyRotateAfter } = this.config;
