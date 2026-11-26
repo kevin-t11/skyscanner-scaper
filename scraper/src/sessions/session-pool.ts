@@ -267,7 +267,7 @@ export class SessionPool {
     }
   }
 
-  /** The next free `{slot}` IP not cooling down (round-robin), else the fallback proxy, else the least-used slot. */
+  /** The next free `{slot}` IP not cooling down (round-robin), else the fallback proxy, else the least-used healthy slot. */
   private pickProxy(): ProxyChoice {
     const { proxyUrl, proxySlots, fallbackProxyUrl } = this.config;
     if (!proxySlots) return { url: proxyUrl };
@@ -276,7 +276,9 @@ export class SessionPool {
       if (fallbackProxyUrl) return { url: fallbackProxyUrl, fallback: true };
       const users = (candidate: number) => this.slotUsers.get(candidate) ?? 0;
       const coolUntil = (candidate: number) => this.slotCoolUntil.get(candidate) ?? 0;
-      slot = this.slotOrder().sort((a, b) => users(a) - users(b) || coolUntil(a) - coolUntil(b))[0]!;
+      const cooling = (candidate: number) => Number(coolUntil(candidate) > Date.now());
+      // A healthy shared IP beats a blocked one, even if the blocked one has no other browser on it.
+      slot = this.slotOrder().sort((a, b) => cooling(a) - cooling(b) || users(a) - users(b) || coolUntil(a) - coolUntil(b))[0]!;
     }
     this.slotUsers.set(slot, (this.slotUsers.get(slot) ?? 0) + 1);
     this.nextSlot = (slot % proxySlots) + 1;
