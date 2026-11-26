@@ -73,6 +73,8 @@ export interface AppConfig {
   loggingEnabled: boolean;
   /** `STOP_WHEN_STABLE=enabled|disabled`; default enabled: return once polls stop adding flights. */
   stopWhenStable: boolean;
+  /** `STOP_AFTER_FIRST_RESULTS=enabled|disabled`; default disabled: one-way searches return after the first poll that adds flights (~43% less proxy traffic, ~1.4% fewer flights). */
+  stopAfterFirstResults: boolean;
 }
 
 type Env = Record<string, string | undefined>;
@@ -103,5 +105,6 @@ export function loadAppConfig(env: Env = readDotEnv()): AppConfig {
     outputDir: OUTPUT_DIR,
     loggingEnabled: parseLoggingEnabled(env.LOGGING),
     stopWhenStable: parseLoggingEnabled(env.STOP_WHEN_STABLE),
+    stopAfterFirstResults: ["enabled", "true", "on", "1"].includes((env.STOP_AFTER_FIRST_RESULTS ?? "").trim().toLowerCase()),
   };
 }

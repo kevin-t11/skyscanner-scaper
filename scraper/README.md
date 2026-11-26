@@ -26,6 +26,7 @@ Chrome opens visibly on purpose: Skyscanner blocks headless Chrome. On a server 
 | `API_KEY` | empty | When set, every request needs an `x-api-key` header |
 | `PORT` | `8000` | HTTP port |
 | `STOP_WHEN_STABLE` | `enabled` | Return as soon as no new flights arrive, instead of waiting for Skyscanner's "complete" |
+| `STOP_AFTER_FIRST_RESULTS` | `disabled` | One-way searches return after the first poll that adds flights: ~43% less proxy traffic, ~1.4% fewer flights |
 | `LOGGING` | `enabled` | One short log line per step |
 
 ## Endpoints

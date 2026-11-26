@@ -27,6 +27,8 @@ export interface UnifiedSearchOptions {
   requestTimeoutMs: number;
   /** Stop once this many polls in a row add no itineraries (0 = wait for `complete`). */
   stablePolls: number;
+  /** Stop after the first poll that adds itineraries beyond the create's cached ones (later polls mostly re-send the same list). */
+  stopAfterFirstResults?: boolean;
 }
 
 export interface UnifiedSearchProgress {
@@ -48,6 +50,8 @@ export interface UnifiedSearchOutcome {
   timedOut: boolean;
   /** True when polling stopped because the result count stopped growing. */
   stable: boolean;
+  /** True when polling stopped after the first poll that added results (`stopAfterFirstResults`). */
+  firstResults: boolean;
   upstreamRequests: number;
   /** Mean time of one search API request, i.e. how fast this session's proxy is. */
   avgRequestMs: number;
@@ -80,6 +84,7 @@ export async function runUnifiedSearch(
   let resultCount = 0;
   let firstResultsMs: number | null = null;
   let unchangedPolls = 0;
+  let createCount = 0;
 
   const step = async (url: string, method: "POST" | "GET", body?: string) => {
     upstreamRequests++;
@@ -115,8 +120,10 @@ export async function runUnifiedSearch(
 
   try {
     await step(options.endpoint, "POST", JSON.stringify(options.body));
+    createCount = resultCount;
+    const firstResults = () => !!options.stopAfterFirstResults && upstreamRequests >= 2 && resultCount > createCount;
     const stable = () => options.stablePolls > 0 && resultCount > 0 && unchangedPolls >= options.stablePolls;
-    while (httpStatus === 200 && !failure && !timedOut && status !== "complete" && sessionId && !stable()) {
+    while (httpStatus === 200 && !failure && !timedOut && status !== "complete" && sessionId && !stable() && !firstResults()) {
       const waitMs = upstreamRequests === 1 ? (options.firstPollDelayMs ?? options.pollIntervalMs) : options.pollIntervalMs;
       if (elapsedMs() + waitMs > options.deadlineMs) {
         timedOut = true;
@@ -136,6 +143,7 @@ export async function runUnifiedSearch(
     complete: !timedOut && status === "complete",
     timedOut,
     stable: status !== "complete" && options.stablePolls > 0 && resultCount > 0 && unchangedPolls >= options.stablePolls,
+    firstResults: status !== "complete" && !!options.stopAfterFirstResults && upstreamRequests >= 2 && resultCount > createCount,
     upstreamRequests,
     avgRequestMs: upstreamRequests ? Math.round(requestMs / upstreamRequests) : 0,
     elapsedMs: elapsedMs(),

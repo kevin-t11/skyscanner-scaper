@@ -180,7 +180,7 @@ export class FlightSearchService implements FlightSearch {
     const outcome = await this.runUnifiedSearch(session, request.query, route, request, log);
     this.pool.recordLatency(session, outcome.avgRequestMs);
     const { counts, itineraries } = rankItineraries(outcome.payloadJson, request.sort, request.maxItems, this.pool.origin);
-    const stoppedBy = outcome.complete ? "complete" : outcome.timedOut ? "deadline reached" : outcome.stable ? "stable" : "partial";
+    const stoppedBy = outcome.complete ? "complete" : outcome.timedOut ? "deadline reached" : outcome.stable ? "stable" : outcome.firstResults ? "first results" : "partial";
     log.info(
       `${stoppedBy} · ${counts.passed}/${counts.received} flights parsed in ${outcome.upstreamRequests} request${outcome.upstreamRequests === 1 ? "" : "s"} ` +
         `(${outcome.avgRequestMs} ms each) · search ${formatDuration(outcome.elapsedMs)}` +
@@ -311,6 +311,7 @@ export class FlightSearchService implements FlightSearch {
         firstPollDelayMs: FIRST_POLL_DELAY_MS,
         requestTimeoutMs: REQUEST_TIMEOUT_MS,
         stablePolls: this.config.stopWhenStable ? STABLE_POLLS : 0,
+        stopAfterFirstResults: this.config.stopAfterFirstResults && query.dates.length === 1,
       },
       ({ step, status, resultCount, newResults }) => {
         const label = step === 1 ? "search created" : `poll ${step}`;
