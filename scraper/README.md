@@ -21,7 +21,10 @@ Chrome opens visibly on purpose: Skyscanner blocks headless Chrome. On a server 
 
 | Name | Default | What it does |
 |---|---|---|
-| `PROXY_URL` | empty | Residential proxy. `{session}` gives each browser its own sticky IP |
+| `PROXY_URL` | empty | Proxy. `{session}` gives each browser its own sticky residential IP; `{slot}` gives it its own number from a fixed-IP list (e.g. Webshare `user-{slot}`) |
+| `PROXY_SLOTS` | `10` | How many IPs `{slot}` counts through. A blocked IP rests 30 min |
+| `FALLBACK_PROXY_URL` | empty | Used while every `{slot}` IP is busy or resting (e.g. Evomi) |
+| `PROXY_ROTATE_AFTER` | `0` | Searches before a `{slot}` or fallback browser moves to the next free IP (spreads load); `0` = never |
 | `POOL_SIZE` | `1` | Browsers kept open. More browsers = more searches at once (~300 MB each). Searches rotate across them; one is replaced only when blocked or when its proxy turns slow |
 | `API_KEY` | empty | When set, every request needs an `x-api-key` header |
 | `PORT` | `8000` | HTTP port |

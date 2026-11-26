@@ -1,6 +1,6 @@
 /**
  * Runtime configuration. Only what changes between machines comes from the `.env` file
- * (`PROXY_URL`, `PORT`, `POOL_SIZE`, `API_KEY`, `LOGGING`, optional `CHROME_PATH`);
+ * (`PROXY_URL`, `PROXY_SLOTS`, `FALLBACK_PROXY_URL`, `PORT`, `POOL_SIZE`, `API_KEY`, `LOGGING`, optional `CHROME_PATH`);
  * everything else is a fixed setting below.
  */
 import { existsSync } from "node:fs";
@@ -58,8 +58,14 @@ export interface AppConfig {
   apiKey: string | undefined;
   /** Browser sessions in the pool (one Chrome and one sticky proxy IP each). */
   poolSize: number;
-  /** `http://user:pass@host:port`; `{session}` is replaced with a per-browser id. */
+  /** `http://user:pass@host:port`; `{session}` is replaced with a per-browser id, `{slot}` with 1…`proxySlots`. */
   proxyUrl: string | undefined;
+  /** Fixed IPs behind `{slot}`; each browser takes a free one. 0 when `proxyUrl` has no `{slot}`. */
+  proxySlots: number;
+  /** Used when every `{slot}` IP is busy or cooling down after a block (e.g. the residential proxy). */
+  fallbackProxyUrl: string | undefined;
+  /** Searches a browser serves before it moves to the next `{slot}` IP; 0 = never. Spreads load across the list. */
+  proxyRotateAfter: number;
   chromePath: string;
   /** Always false: Skyscanner's search API blocks headless Chrome. */
   headless: boolean;
@@ -93,6 +99,9 @@ export function loadAppConfig(env: Env = readDotEnv()): AppConfig {
     apiKey: env.API_KEY || undefined,
     poolSize: positiveInt(env.POOL_SIZE, 1),
     proxyUrl: env.PROXY_URL || undefined,
+    proxySlots: env.PROXY_URL?.includes("{slot}") ? positiveInt(env.PROXY_SLOTS, 10) : 0,
+    fallbackProxyUrl: env.FALLBACK_PROXY_URL || undefined,
+    proxyRotateAfter: positiveInt(env.PROXY_ROTATE_AFTER, 0),
     chromePath: env.CHROME_PATH || findChrome(),
     headless: false,
     skyscannerHost: SKYSCANNER_SITE.host,

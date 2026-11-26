@@ -29,7 +29,15 @@ function parseProxyUrl(proxyUrl: string): ProxySettings {
   };
 }
 
-/** Gives each browser its own sticky proxy session by filling the `{session}` placeholder. */
-export function proxyForSession(proxyUrlTemplate: string | undefined, sessionId: string): ProxySettings | undefined {
-  return proxyUrlTemplate ? parseProxyUrl(proxyUrlTemplate.replaceAll("{session}", sessionId)) : undefined;
+/**
+ * Gives each browser its own proxy IP: `{session}` becomes a per-browser id (sticky residential sessions),
+ * `{slot}` a fixed-IP number from a numbered proxy list (e.g. Webshare's `user-1` … `user-100`).
+ */
+export function proxyForSession(
+  proxyUrlTemplate: string | undefined,
+  sessionId: string,
+  slot?: number,
+): ProxySettings | undefined {
+  if (!proxyUrlTemplate) return undefined;
+  return parseProxyUrl(proxyUrlTemplate.replaceAll("{session}", sessionId).replaceAll("{slot}", String(slot ?? 1)));
 }

@@ -107,7 +107,7 @@ export class FlightSearchService implements FlightSearch {
       log.info(`session ${session.id} acquired${attempt > 1 ? ` (retry ${attempt - 1})` : ""}`);
       try {
         const result = await session.run(() => this.searchOnSession(session, request, startedAt, log));
-        this.pool.recordSuccess();
+        this.pool.recordSuccess(session);
         return result;
       } catch (error) {
         // Blocks, network failures (e.g. a dead sticky proxy) and browser failures (crash, lost CDP

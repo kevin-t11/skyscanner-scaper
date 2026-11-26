@@ -17,6 +17,8 @@ const LAUNCH_RETRY_BACKOFF_MS = [1_000, 5_000, 15_000, 60_000];
 const DEFAULT_ACQUIRE_TIMEOUT_MS = 30_000;
 /** A session whose requests average this slow, and 2x slower than the pool, is replaced. */
 const SLOW_REQUEST_MS = 3_000;
+/** A `{slot}` IP whose browser was blocked or retired rests this long before it is used again. */
+const SLOT_COOLDOWN_MS = 30 * 60_000;
 const log = createLogger("pool");
 
 /** `GET /health` body, shaped like the Zillow scraper's: a status plus pool counters. */
@@ -34,7 +36,12 @@ export interface PoolHealth {
   /** ISO time of the last search that passed. */
   last_success_at: string | null;
   proxy: boolean;
+  /** Present when `PROXY_URL` uses `{slot}`. */
+  proxy_slots?: { total: number; in_use: number; cooling: number; fallback_sessions: number };
 }
+
+/** The proxy a session was launched on: a numbered `{slot}` IP, the fallback proxy, or the plain `PROXY_URL`. */
+type ProxyChoice = { url: string | undefined; slot?: number; fallback?: boolean };
 
 export class SessionPool {
   private readonly sessions = new Set<BrowserSession>();
@@ -47,6 +54,11 @@ export class SessionPool {
   private readonly counters = { launched: 0, retired: 0, launchErrors: 0 };
   private lastError: string | null = null;
   private lastSuccessAt: number | null = null;
+  private readonly sessionProxies = new Map<BrowserSession, ProxyChoice>();
+  private readonly sessionSearches = new Map<BrowserSession, number>();
+  private readonly slotsInUse = new Set<number>();
+  private readonly slotCoolUntil = new Map<number, number>();
+  private nextSlot = 1;
   /** Runs on each new session before it takes searches; a throw fails the launch, so a blocked IP never serves one. */
   private warmUp?: (session: BrowserSession) => Promise<void>;
 
@@ -113,9 +125,16 @@ export class SessionPool {
     return succeeded;
   }
 
-  /** Records a search that passed; kept on the pool so it survives session replacement. */
-  recordSuccess(): void {
+  /** Records a search that passed; after `proxyRotateAfter` searches a `{slot}` or fallback browser moves to the next free IP. */
+  recordSuccess(session: BrowserSession): void {
     this.lastSuccessAt = Date.now();
+    const searches = (this.sessionSearches.get(session) ?? 0) + 1;
+    this.sessionSearches.set(session, searches);
+    const { proxyRotateAfter } = this.config;
+    const proxy = this.sessionProxies.get(session);
+    if (proxyRotateAfter && searches >= proxyRotateAfter && (proxy?.slot || proxy?.fallback)) {
+      this.retire(session, `rotating to a new IP after ${searches} searches`, { coolSlot: false });
+    }
   }
 
   /** Replaces a session whose proxy IP has become much slower than the rest of the pool. */
@@ -136,8 +155,11 @@ export class SessionPool {
   }
 
   /** Retires a session and launches a replacement with a new proxy IP. */
-  retire(session: BrowserSession, reason: string): void {
+  retire(session: BrowserSession, reason: string, { coolSlot = true } = {}): void {
     if (!this.sessions.delete(session)) return;
+    this.releaseProxy(this.sessionProxies.get(session), coolSlot && reason !== "Chrome exited");
+    this.sessionProxies.delete(session);
+    this.sessionSearches.delete(session);
     session.retire();
     this.counters.retired++;
     log.warn(`session ${session.id} retired after ${session.upstreamRequests} requests: ${reason}`);
@@ -161,6 +183,14 @@ export class SessionPool {
       oldest_session_age_s: sessions.length ? Math.round((Date.now() - oldestStartedAt) / 100) / 10 : null,
       last_success_at: this.lastSuccessAt ? new Date(this.lastSuccessAt).toISOString() : null,
       proxy: Boolean(this.config.proxyUrl),
+      ...(this.config.proxySlots && {
+        proxy_slots: {
+          total: this.config.proxySlots,
+          in_use: this.slotsInUse.size,
+          cooling: [...this.slotCoolUntil.values()].filter((until) => until > Date.now()).length,
+          fallback_sessions: [...this.sessionProxies.values()].filter((choice) => choice.fallback).length,
+        },
+      }),
     };
   }
 
@@ -186,13 +216,15 @@ export class SessionPool {
     let browser: ChromeBrowser | undefined;
     const launchStartedAt = performance.now();
     const { config } = this;
-    log.info(`session ${id} launching${config.proxyUrl ? " via proxy" : " without proxy"}`);
+    const proxy = this.pickProxy();
+    const via = proxy.slot ? ` via proxy slot ${proxy.slot}` : proxy.fallback ? " via fallback proxy" : proxy.url ? " via proxy" : " without proxy";
+    log.info(`session ${id} launching${via}`);
     try {
       browser = await ChromeBrowser.launch({
         chromePath: config.chromePath,
         headless: config.headless,
         locale: config.locale,
-        proxy: proxyForSession(config.proxyUrl, id),
+        proxy: proxyForSession(proxy.url, id, proxy.slot),
       });
       this.warmingBrowsers.add(browser);
       if (this.stopped) throw new Error("pool stopped");
@@ -211,6 +243,7 @@ export class SessionPool {
       if (this.stopped) throw new Error("pool stopped");
 
       this.sessions.add(session);
+      this.sessionProxies.set(session, proxy);
       this.consecutiveLaunchFailures = 0;
       this.counters.launched++;
       log.info(`session ${id} ready in ${formatDuration(performance.now() - launchStartedAt)} (${this.sessions.size}/${config.poolSize} ready)`);
@@ -220,6 +253,7 @@ export class SessionPool {
         this.warmingBrowsers.delete(browser);
         await browser.close().catch(() => undefined);
       }
+      this.releaseProxy(proxy, true);
       if (this.stopped) return;
       this.consecutiveLaunchFailures++;
       this.counters.launchErrors++;
@@ -227,6 +261,31 @@ export class SessionPool {
       log.error(`session ${id} failed to start: ${(error as Error).message}`);
       this.launchInBackground();
     }
+  }
+
+  /** The next free `{slot}` IP not cooling down (round-robin), else the fallback proxy, else the least-recently-blocked slot. */
+  private pickProxy(): ProxyChoice {
+    const { proxyUrl, proxySlots, fallbackProxyUrl } = this.config;
+    if (!proxySlots) return { url: proxyUrl };
+    const now = Date.now();
+    const free: number[] = [];
+    for (let i = 0; i < proxySlots; i++) {
+      const slot = ((this.nextSlot - 1 + i) % proxySlots) + 1;
+      if (!this.slotsInUse.has(slot)) free.push(slot);
+    }
+    const slot =
+      free.find((candidate) => (this.slotCoolUntil.get(candidate) ?? 0) <= now) ??
+      (fallbackProxyUrl ? undefined : free.sort((a, b) => (this.slotCoolUntil.get(a) ?? 0) - (this.slotCoolUntil.get(b) ?? 0))[0]);
+    if (slot === undefined) return { url: fallbackProxyUrl, fallback: true };
+    this.slotsInUse.add(slot);
+    this.nextSlot = (slot % proxySlots) + 1;
+    return { url: proxyUrl, slot };
+  }
+
+  private releaseProxy(choice: ProxyChoice | undefined, cool: boolean): void {
+    if (!choice?.slot) return;
+    this.slotsInUse.delete(choice.slot);
+    if (cool) this.slotCoolUntil.set(choice.slot, Date.now() + SLOT_COOLDOWN_MS);
   }
 
   /** Sleeps before a relaunch; ends immediately on stop() and leaves no listener behind. */
