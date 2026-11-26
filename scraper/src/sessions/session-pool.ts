@@ -56,7 +56,8 @@ export class SessionPool {
   private lastSuccessAt: number | null = null;
   private readonly sessionProxies = new Map<BrowserSession, ProxyChoice>();
   private readonly sessionSearches = new Map<BrowserSession, number>();
-  private readonly slotsInUse = new Set<number>();
+  /** Browsers per `{slot}` IP; more than one only when the pool outnumbers the slots and there is no fallback. */
+  private readonly slotUsers = new Map<number, number>();
   private readonly slotCoolUntil = new Map<number, number>();
   private nextSlot = 1;
   /** Runs on each new session before it takes searches; a throw fails the launch, so a blocked IP never serves one. */
@@ -187,7 +188,7 @@ export class SessionPool {
       ...(this.config.proxySlots && {
         proxy_slots: {
           total: this.config.proxySlots,
-          in_use: this.slotsInUse.size,
+          in_use: this.slotUsers.size,
           cooling: [...this.slotCoolUntil.values()].filter((until) => until > Date.now()).length,
           fallback_sessions: [...this.sessionProxies.values()].filter((choice) => choice.fallback).length,
         },
@@ -264,28 +265,39 @@ export class SessionPool {
     }
   }
 
-  /** The next free `{slot}` IP not cooling down (round-robin), else the fallback proxy, else the least-recently-blocked slot. */
+  /** The next free `{slot}` IP not cooling down (round-robin), else the fallback proxy, else the least-used slot. */
   private pickProxy(): ProxyChoice {
     const { proxyUrl, proxySlots, fallbackProxyUrl } = this.config;
     if (!proxySlots) return { url: proxyUrl };
-    const now = Date.now();
-    const free: number[] = [];
-    for (let i = 0; i < proxySlots; i++) {
-      const slot = ((this.nextSlot - 1 + i) % proxySlots) + 1;
-      if (!this.slotsInUse.has(slot)) free.push(slot);
+    let slot = this.freeSlot();
+    if (slot === undefined) {
+      if (fallbackProxyUrl) return { url: fallbackProxyUrl, fallback: true };
+      const users = (candidate: number) => this.slotUsers.get(candidate) ?? 0;
+      const coolUntil = (candidate: number) => this.slotCoolUntil.get(candidate) ?? 0;
+      slot = this.slotOrder().sort((a, b) => users(a) - users(b) || coolUntil(a) - coolUntil(b))[0]!;
     }
-    const slot =
-      free.find((candidate) => (this.slotCoolUntil.get(candidate) ?? 0) <= now) ??
-      (fallbackProxyUrl ? undefined : free.sort((a, b) => (this.slotCoolUntil.get(a) ?? 0) - (this.slotCoolUntil.get(b) ?? 0))[0]);
-    if (slot === undefined) return { url: fallbackProxyUrl, fallback: true };
-    this.slotsInUse.add(slot);
+    this.slotUsers.set(slot, (this.slotUsers.get(slot) ?? 0) + 1);
     this.nextSlot = (slot % proxySlots) + 1;
     return { url: proxyUrl, slot };
   }
 
+  /** Slots in round-robin order, starting after the last one handed out. */
+  private slotOrder(): number[] {
+    const { proxySlots } = this.config;
+    return Array.from({ length: proxySlots }, (_, i) => ((this.nextSlot - 1 + i) % proxySlots) + 1);
+  }
+
+  /** A slot no browser uses and that is not cooling down. */
+  private freeSlot(): number | undefined {
+    const now = Date.now();
+    return this.slotOrder().find((slot) => !this.slotUsers.has(slot) && (this.slotCoolUntil.get(slot) ?? 0) <= now);
+  }
+
   private releaseProxy(choice: ProxyChoice | undefined, cool: boolean): void {
     if (!choice?.slot) return;
-    this.slotsInUse.delete(choice.slot);
+    const users = (this.slotUsers.get(choice.slot) ?? 1) - 1;
+    if (users > 0) this.slotUsers.set(choice.slot, users);
+    else this.slotUsers.delete(choice.slot);
     if (cool) this.slotCoolUntil.set(choice.slot, Date.now() + SLOT_COOLDOWN_MS);
   }
 
