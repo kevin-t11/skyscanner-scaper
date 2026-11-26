@@ -35,8 +35,8 @@ export const SKYSCANNER_SITE = {
 // { host: "www.skyscanner.co.kr", market: "KR", locale: "ko-KR", currency: "KRW" } // South Korea
 // { host: "www.skyscanner.com.mx", market: "MX", locale: "es-MX", currency: "MXN" } // Mexico
 
-/** Upper bound for one search, including all polls; partial results are returned after it. */
-const SEARCH_DEADLINE_MS = 12_000;
+/** Upper bound for one search, including all polls; partial results are returned after it. Big return searches need ~20-30 s to reach `complete`. */
+const SEARCH_DEADLINE_MS = 30_000;
 
 /** Where each `/url` response is saved as JSON. */
 const OUTPUT_DIR = "output";
@@ -71,7 +71,7 @@ export interface AppConfig {
   outputDir: string;
   /** `LOGGING=enabled|disabled`; default enabled. */
   loggingEnabled: boolean;
-  /** `STOP_WHEN_STABLE=enabled|disabled`; default enabled: return once polls stop adding flights. */
+  /** `STOP_WHEN_STABLE=enabled|disabled`; default disabled: wait for Skyscanner's `complete` (full results). */
   stopWhenStable: boolean;
 }
 
@@ -99,9 +99,9 @@ export function loadAppConfig(env: Env = readDotEnv()): AppConfig {
     market: SKYSCANNER_SITE.market,
     locale: SKYSCANNER_SITE.locale,
     currency: SKYSCANNER_SITE.currency,
-    searchDeadlineMs: SEARCH_DEADLINE_MS,
+    searchDeadlineMs: positiveInt(env.SEARCH_DEADLINE_MS, SEARCH_DEADLINE_MS),
     outputDir: OUTPUT_DIR,
     loggingEnabled: parseLoggingEnabled(env.LOGGING),
-    stopWhenStable: parseLoggingEnabled(env.STOP_WHEN_STABLE),
+    stopWhenStable: ["enabled", "true", "on", "1"].includes((env.STOP_WHEN_STABLE ?? "").trim().toLowerCase()),
   };
 }
