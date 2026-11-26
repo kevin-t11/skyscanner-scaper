@@ -134,7 +134,9 @@ export class SessionPool {
     this.sessionSearches.set(session, searches);
     const { proxyRotateAfter } = this.config;
     const proxy = this.sessionProxies.get(session);
-    if (proxyRotateAfter && searches >= proxyRotateAfter && (proxy?.slot || proxy?.fallback)) {
+    // Only when the replacement can get a different IP; otherwise the healthy browser would just restart on the same one.
+    const canMove = (proxy?.slot || proxy?.fallback) && this.freeSlot() !== undefined;
+    if (proxyRotateAfter && searches >= proxyRotateAfter && canMove) {
       this.retire(session, `rotating to a new IP after ${searches} searches`, { coolSlot: false });
     }
   }
