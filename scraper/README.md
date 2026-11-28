@@ -27,6 +27,9 @@ Chrome opens visibly on purpose: Skyscanner blocks headless Chrome. On a server 
 | `PORT` | `8000` | HTTP port |
 | `STOP_WHEN_STABLE` | `disabled` | `enabled` returns as soon as no new flights arrive (faster, can miss ~5% on return searches); `disabled` waits for Skyscanner's "complete" |
 | `SEARCH_DEADLINE_MS` | `30000` | Cap for one search; partial results are returned after it |
+| `FIRST_POLL_ONE_WAY_MS` | `8000` | Wait before the first poll of a one-way search. Each poll re-downloads every flight so far, so early polls waste proxy data |
+| `FIRST_POLL_RETURN_MS` | `14000` | Same for return searches, which take longer to finish |
+| `POLL_INTERVAL_MS` | `2000` | Wait between later polls |
 | `LOGGING` | `enabled` | One short log line per step |
 
 ## Endpoints

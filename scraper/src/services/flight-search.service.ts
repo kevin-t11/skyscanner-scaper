@@ -67,9 +67,6 @@ export interface FlightSearch {
   suggestPlaces(text: string, isDestination: boolean): Promise<Place[]>;
 }
 
-/** The first poll waits longer: each poll re-downloads every flight found so far. */
-const FIRST_POLL_DELAY_MS = 3_000;
-const POLL_INTERVAL_MS = 2_000;
 /** Skyscanner answers a poll in ~1-2 s; a request hanging past this is a dead proxy connection. */
 const REQUEST_TIMEOUT_MS = 6_000;
 /** Late polls of big return searches re-download 2,000+ flights (several MB) and can take ~7-10 s on a slow proxy. */
@@ -300,7 +297,7 @@ export class FlightSearchService implements FlightSearch {
     request: FlightSearchRequest,
     log: Logger,
   ): Promise<UnifiedSearchOutcome> {
-    const { market, locale, searchDeadlineMs } = this.config;
+    const { market, locale, searchDeadlineMs, firstPollOneWayMs, firstPollReturnMs, pollIntervalMs } = this.config;
     const { currency } = request;
     const outcome = await runUnifiedSearch(
       session.browser,
@@ -309,8 +306,8 @@ export class FlightSearchService implements FlightSearch {
         headers: buildUnifiedSearchHeaders({ market, locale, currency }),
         body: buildUnifiedSearchBody(query, route),
         deadlineMs: searchDeadlineMs,
-        pollIntervalMs: POLL_INTERVAL_MS,
-        firstPollDelayMs: FIRST_POLL_DELAY_MS,
+        pollIntervalMs,
+        firstPollDelayMs: query.dates.length > 1 ? firstPollReturnMs : firstPollOneWayMs,
         requestTimeoutMs: SEARCH_REQUEST_TIMEOUT_MS,
         stablePolls: this.config.stopWhenStable ? STABLE_POLLS : 0,
       },

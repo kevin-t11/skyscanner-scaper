@@ -38,6 +38,15 @@ export const SKYSCANNER_SITE = {
 /** Upper bound for one search, including all polls; partial results are returned after it. Big return searches need ~20-30 s to reach `complete`. */
 const SEARCH_DEADLINE_MS = 30_000;
 
+/**
+ * Every poll re-downloads all flights found so far, and only the `complete` one is returned, so
+ * polling before Skyscanner can finish wastes proxy data. One-way searches rarely finish before
+ * ~8 s and return searches before ~19 s; after the first poll, poll every POLL_INTERVAL_MS.
+ */
+const FIRST_POLL_ONE_WAY_MS = 8_000;
+const FIRST_POLL_RETURN_MS = 14_000;
+const POLL_INTERVAL_MS = 2_000;
+
 /** Where each `/url` response is saved as JSON. */
 const OUTPUT_DIR = "output";
 
@@ -68,6 +77,10 @@ export interface AppConfig {
   locale: string;
   currency: string;
   searchDeadlineMs: number;
+  /** Wait after the search is created before the first poll; one-way and return searches differ. */
+  firstPollOneWayMs: number;
+  firstPollReturnMs: number;
+  pollIntervalMs: number;
   outputDir: string;
   /** `LOGGING=enabled|disabled`; default enabled. */
   loggingEnabled: boolean;
@@ -100,6 +113,9 @@ export function loadAppConfig(env: Env = readDotEnv()): AppConfig {
     locale: SKYSCANNER_SITE.locale,
     currency: SKYSCANNER_SITE.currency,
     searchDeadlineMs: positiveInt(env.SEARCH_DEADLINE_MS, SEARCH_DEADLINE_MS),
+    firstPollOneWayMs: positiveInt(env.FIRST_POLL_ONE_WAY_MS, FIRST_POLL_ONE_WAY_MS),
+    firstPollReturnMs: positiveInt(env.FIRST_POLL_RETURN_MS, FIRST_POLL_RETURN_MS),
+    pollIntervalMs: positiveInt(env.POLL_INTERVAL_MS, POLL_INTERVAL_MS),
     outputDir: OUTPUT_DIR,
     loggingEnabled: parseLoggingEnabled(env.LOGGING),
     stopWhenStable: ["enabled", "true", "on", "1"].includes((env.STOP_WHEN_STABLE ?? "").trim().toLowerCase()),
