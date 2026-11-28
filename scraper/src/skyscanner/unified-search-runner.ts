@@ -117,7 +117,9 @@ export async function runUnifiedSearch(
     await step(options.endpoint, "POST", JSON.stringify(options.body));
     const stable = () => options.stablePolls > 0 && resultCount > 0 && unchangedPolls >= options.stablePolls;
     while (httpStatus === 200 && !failure && !timedOut && status !== "complete" && sessionId && !stable()) {
-      const waitMs = upstreamRequests === 1 ? (options.firstPollDelayMs ?? options.pollIntervalMs) : options.pollIntervalMs;
+      let waitMs = upstreamRequests === 1 ? (options.firstPollDelayMs ?? options.pollIntervalMs) : options.pollIntervalMs;
+      // A first-poll delay longer than the deadline allows is shortened so at least one poll still runs.
+      if (upstreamRequests === 1) waitMs = Math.min(waitMs, Math.max(0, options.deadlineMs - elapsedMs() - options.pollIntervalMs));
       if (elapsedMs() + waitMs > options.deadlineMs) {
         timedOut = true;
         break;
